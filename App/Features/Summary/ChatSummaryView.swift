@@ -45,7 +45,7 @@ struct ChatSummaryView: View {
         .toolbar {
             if let onClose {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("إغلاق") { onClose?() }
+                    Button("إغلاق") { onClose() }
                 }
             }
         }
