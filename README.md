@@ -54,6 +54,11 @@ App/
 
 أو عبر GitHub Actions: كل دفع إلى `main` يشغّل `Build Sanad AI 3.0` وينتج IPA غير موقّع في Releases.
 
+## الإصدار الحالي
+
+- **`sanad3-build-4`** — https://github.com/moha700m/Sand/releases/tag/sanad3-build-4
+- 72 اختباراً، 0 فشل. التفاصيل في `TEST_REPORT.md`.
+
 ## التثبيت عبر ESign
 
 1. نزّل `SanadAI.ipa` من Releases.
