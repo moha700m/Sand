@@ -302,3 +302,4 @@ public final class AgentPackageStore {
                      """,
                      icon: "hammer", tools: ["workspace_*", "run_javascript", "notes_add"], maxSteps: 14, builtIn: true),
     ]
+}
