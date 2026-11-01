@@ -13,6 +13,8 @@ struct MoreView: View {
                     NavigationLink(value: "workspace") { row("مساحة العمل", "folder.fill", .orange, "\(state.packages.count) مساحة · \(state.workspace.totalBytes(state.workspaceContext.agentID).fileSize)") }
                     NavigationLink(value: "skills") { row("المهارات", "books.vertical.fill", .teal, "\(state.skills.all.count) مهارة · SKILL.md") }
                     NavigationLink(value: "importModel") { row("إضافة نموذج بالرابط", "arrow.down.circle", .indigo, "Hugging Face · GGUF") }
+                    NavigationLink(value: "arena") { row("الساحة", "trophy", .yellow, "مقارنة أ/ب · وضع أعمى · تصنيف Elo") }
+                    NavigationLink(value: "modelDetail") { row("قياس النموذج", "speedometer", .mint, "سرعة · تقييم جودة · إعدادات") }
                 }
                 Section {
                     NavigationLink(value: "lens") { row("العدسة", "camera.viewfinder", .cyan, "قراءة نص من صورة ثم شرح أو ترجمة") }
@@ -44,6 +46,8 @@ struct MoreView: View {
                 case "workspace": WorkspaceView()
                 case "skills": SkillsView()
                 case "importModel": ModelImportView()
+                case "arena": ArenaView()
+                case "modelDetail": ModelDetailView(ref: "local", displayName: state.models.activeModel?.name ?? "نموذج محلي")
                 case "lens": LensView()
                 case "saudi": SaudiToolsView()
                 case "knowledge": KnowledgeView()
@@ -61,7 +65,7 @@ struct MoreView: View {
     }
 
     func openDeepLink() {
-        if let s = state.deepLinkScreen, ["saudi", "server", "knowledge", "settings", "providers", "mcp", "memory", "tools", "workspace", "skills", "lens", "importModel"].contains(s) {
+        if let s = state.deepLinkScreen, ["saudi", "server", "knowledge", "settings", "providers", "mcp", "memory", "tools", "workspace", "skills", "lens", "importModel", "arena", "modelDetail"].contains(s) {
             state.deepLinkScreen = nil
             path.append(s)
         }

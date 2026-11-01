@@ -134,7 +134,8 @@ final class ChatViewModel: ObservableObject {
     }
 
     private func runChat(state: AppState) async {
-        let settings = state.settings.generation
+        let settings = ModelTuningStore.shared.tuning(for: modelRef ?? "local")
+            .applied(to: state.settings.generation)
         let backend = state.backend(for: modelRef)
         let name = state.modelName(for: modelRef)
         var msgs = [ChatMessage(role: .system, content: persona.systemPrompt
@@ -175,7 +176,9 @@ final class ChatViewModel: ObservableObject {
         profile.maxSteps = max(agent.maxSteps, state.settings.agentMaxSteps)
         let name = state.modelName(for: modelRef)
         do {
-            let (answer, steps) = try await loop.run(goal: goal, history: history, profile: profile) { [weak self] ev in
+            let tuned = ModelTuningStore.shared.tuning(for: modelRef ?? "local")
+                .applied(to: state.settings.generation)
+            let (answer, steps) = try await loop.run(goal: goal, history: history, profile: profile, settings: tuned) { [weak self] ev in
                 Task { @MainActor in
                     switch ev {
                     case .step(let s): self?.liveSteps.append(s); self?.streaming = ""
