@@ -86,7 +86,7 @@ public enum WorkspaceTools {
 
         r.register(ClosureTool(ToolSpec(
             name: "workspace_zip", title: "تصدير ZIP", icon: "archivebox",
-            description: "Package the workspace into a ZIP file in the app's temporary folder."))) { _ in
+            description: "Package the workspace into a ZIP file in the app's temporary folder.")) { _ in
             let url = try store.exportZip(context.agentID)
             let bytes = (try? Data(contentsOf: url).count) ?? 0
             let size = ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
