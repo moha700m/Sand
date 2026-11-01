@@ -132,6 +132,10 @@ final class ModelManager: NSObject, ObservableObject {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         guard url.pathExtension.lowercased() == "gguf" else { throw ToolError("الملف يجب أن يكون بصيغة GGUF") }
+        let info = GGUFInspector.inspect(url)
+        guard info.isUsable else {
+            throw ToolError("ملف GGUF غير صالح: " + (info.problems.first ?? "بنية غير مكتملة"))
+        }
         let dest = Self.modelsDirectory.appendingPathComponent(url.lastPathComponent)
         if FileManager.default.fileExists(atPath: dest.path) { try FileManager.default.removeItem(at: dest) }
         try FileManager.default.copyItem(at: url, to: dest)
@@ -156,6 +160,10 @@ final class ModelManager: NSObject, ObservableObject {
         isLoading = true
         lastError = nil
         let path = fileURL(for: m).path
+        guard GGUFInspector.looksLikeGGUF(fileURL(for: m)) else {
+            lastError = "الملف ليس GGUF صالحاً — أعد تحميل النموذج."
+            return
+        }
         let ctx = min(contextLength, m.contextLength)
         let engine = self.engine
         do {
@@ -214,6 +222,12 @@ extension ModelManager: URLSessionDownloadDelegate {
             guard let m = registered[id] ?? ModelCatalog.model(id: id) else { return }
             guard moved, status < 400 else {
                 downloads[id]?.failed = "فشل التحميل (HTTP \(status))"
+                return
+            }
+            let info = GGUFInspector.inspect(staged)
+            guard info.isUsable else {
+                try? FileManager.default.removeItem(at: staged)
+                downloads[id]?.failed = "الملف الذي نزل ليس GGUF صالحاً: " + (info.problems.first ?? "")
                 return
             }
             let dest = fileURL(for: m)

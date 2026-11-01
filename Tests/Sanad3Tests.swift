@@ -245,3 +245,59 @@ final class ArenaTests: XCTestCase {
         XCTAssertFalse(arabic.check("Riyadh"))
     }
 }
+
+// MARK: - GGUF inspector (port of MIT component + fixes)
+
+final class GGUFInspectorTests: XCTestCase {
+    func makeFile(_ data: Data, name: String = "model.gguf") -> URL {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("gguf-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent(name)
+        try? data.write(to: url)
+        return url
+    }
+
+    func header(version: UInt32 = 3, tensors: UInt64 = 1, kv: UInt64 = 0) -> Data {
+        var d = Data([0x47, 0x47, 0x55, 0x46])
+        withUnsafeBytes(of: version.littleEndian) { d.append(contentsOf: $0) }
+        withUnsafeBytes(of: tensors.littleEndian) { d.append(contentsOf: $0) }
+        withUnsafeBytes(of: kv.littleEndian) { d.append(contentsOf: $0) }
+        return d
+    }
+
+    func testValidHeaderIsUsable() {
+        let url = makeFile(header())
+        let info = GGUFInspector.inspect(url)
+        XCTAssertTrue(info.isUsable, info.problems.joined())
+        XCTAssertEqual(info.version, 3)
+    }
+
+    func testWrongMagicRejected() {
+        let url = makeFile(Data(repeating: 0x00, count: 64))
+        XCTAssertFalse(GGUFInspector.inspect(url).isUsable)
+    }
+
+    func testTruncatedRejected() {
+        let url = makeFile(Data([0x47, 0x47]))
+        XCTAssertFalse(GGUFInspector.inspect(url).isUsable)
+    }
+
+    func testArchitectureParsed() {
+        var d = header(kv: 1)
+        let key = Array("general.architecture".utf8)
+        withUnsafeBytes(of: UInt64(key.count).littleEndian) { d.append(contentsOf: $0) }
+        d.append(contentsOf: key)
+        withUnsafeBytes(of: UInt32(8).littleEndian) { d.append(contentsOf: $0) }   // string
+        let value = Array("llama".utf8)
+        withUnsafeBytes(of: UInt64(value.count).littleEndian) { d.append(contentsOf: $0) }
+        d.append(contentsOf: value)
+        let info = GGUFInspector.inspect(makeFile(d))
+        XCTAssertEqual(info.architecture, "llama")
+        XCTAssertTrue(info.isUsable)
+    }
+
+    func testProjectorNameDetected() {
+        let url = makeFile(header(), name: "mmproj-model.gguf")
+        XCTAssertTrue(GGUFInspector.inspect(url).isProjector)
+    }
+}
