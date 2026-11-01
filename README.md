@@ -16,6 +16,8 @@
 | تصدير ZIP بدون مكتبات خارجية | منفّذ | store-only، مع قارئ للأرشيفات المماثلة |
 | فحص توافق النماذج | منفّذ | يعلن بوضوح أن MLX غير مضمّن |
 | PrivacyInfo.xcprivacy | منفّذ | مطلوب للرفع إلى App Store |
+| ساحة مقارنة النماذج (Elo) | منفّذ | A/B + وضع أعمى + تصنيف محلي |
+| تقييم جودة حتمي + قياس سرعة | منفّذ | 6 اختبارات على الجهاز |
 
 ## ما هو غير منفّذ (بصراحة)
 
@@ -56,8 +58,8 @@ App/
 
 ## الإصدار الحالي
 
-- **`sanad3-build-4`** — https://github.com/moha700m/Sand/releases/tag/sanad3-build-4
-- 72 اختباراً، 0 فشل. التفاصيل في `TEST_REPORT.md`.
+- **`sanad3-build-5`** — https://github.com/moha700m/Sand/releases/tag/sanad3-build-5
+- 78 اختباراً، 0 فشل. التفاصيل في `TEST_REPORT.md`.
 
 ## التثبيت عبر ESign
 
