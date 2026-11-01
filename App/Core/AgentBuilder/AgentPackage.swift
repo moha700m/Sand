@@ -265,26 +265,40 @@ public final class AgentPackageStore {
     // MARK: Built-ins
 
     public static let builtIns: [AgentPackage] = [
-        AgentPackage(id: "sanad3", name: "سَنَد الشامل", summary: "وكيل عام يخطط وينفّذ بكل الأدوات",
+        AgentPackage(id: "sanad", name: "سَنَد الشامل", summary: "وكيل عام يخطط وينفّذ بكل الأدوات",
                      instructions: "أنت وكيل عام. قسّم المهمة، استخدم الأدوات للمعلومة الدقيقة، واحفظ الحقائق الدائمة في الذاكرة.",
                      icon: "wand.and.stars", tools: ["*"], maxSteps: 10, allowNetwork: false, builtIn: true),
-        AgentPackage(id: "builder3", name: "بنّاء التطبيقات", summary: "ينشئ ملفات مشاريع ويصدّرها ZIP",
+        AgentPackage(id: "deep_research", name: "البحث العميق", summary: "يبحث في الويب ويقرأ المصادر ويكتب تقريراً موثّقاً",
                      instructions: """
-                     أنت مهندس برمجيات. لأي طلب: أنشئ هيكل المشروع في مساحة العمل عبر workspace_mkdir و workspace_write، \
-                     اكتب ملفات كاملة قابلة للقراءة، ثم اذكر شجرة الملفات. لا تدّعي أنك جمّعت المشروع.
+                     أنت باحث محترف. (1) ابحث بـ web_search بثلاث صيغ مختلفة. (2) اقرأ أهم 3-5 مصادر كاملة بـ fetch_url. \
+                     (3) قارن المعلومات وتحقق من التواريخ. (4) اكتب تقريراً منظماً بعناوين، وضع المصادر كروابط مرقمة في النهاية.
+                     """,
+                     icon: "sparkle.magnifyingglass", tools: ["web_search", "fetch_url", "calculator", "current_datetime", "notes_add", "workspace_write"],
+                     maxSteps: 14, allowNetwork: true, builtIn: true),
+        AgentPackage(id: "analyst", name: "محلل البيانات", summary: "يكتب وينفّذ JavaScript لتحليل الأرقام والجداول بدقة",
+                     instructions: "أنت محلل بيانات. لأي حساب اكتب JavaScript ونفّذه بـ run_javascript واطبع النتائج، ثم فسّرها في جدول Markdown.",
+                     icon: "chart.xyaxis.line", tools: ["run_javascript", "calculator", "workspace_read", "workspace_write", "notes_add"],
+                     maxSteps: 10, builtIn: true),
+        AgentPackage(id: "researcher", name: "باحث المستندات", summary: "يبحث في قاعدة معرفتك ويجيب مع المصادر",
+                     instructions: "ابحث دائماً في قاعدة المعرفة أولاً، وأجب فقط بما تجده مع ذكر اسم المستند بين قوسين. إذا لم تجد فقل ذلك.",
+                     icon: "doc.text.magnifyingglass", tools: ["knowledge_search", "read_document", "calculator", "notes_add"],
+                     maxSteps: 6, builtIn: true),
+        AgentPackage(id: "finance", name: "المستشار المالي", summary: "زكاة، ضريبة القيمة المضافة، مكافأة نهاية الخدمة",
+                     instructions: "أنت مساعد مالي سعودي. استخدم أدوات الحساب دائماً ولا تحسب ذهنياً. اعرض النتيجة بالريال مع شرح مختصر.",
+                     icon: "banknote", tools: ["zakat", "vat", "end_of_service", "calculator", "hijri_date"],
+                     maxSteps: 6, builtIn: true),
+        AgentPackage(id: "organizer", name: "منظّم المهام", summary: "تذكيرات، مواعيد، ملاحظات، مواقيت الصلاة",
+                     instructions: "حوّل طلبات المستخدم إلى تذكيرات أو مواعيد أو ملاحظات. استخدم current_datetime قبل أي تاريخ.",
+                     icon: "checklist", tools: ["current_datetime", "hijri_date", "prayer_times", "create_reminder", "create_event", "notes_add", "notes_search"],
+                     maxSteps: 6, builtIn: true),
+        AgentPackage(id: "coder", name: "المبرمج", summary: "يكتب ويراجع الكود ويحفظ المقتطفات",
+                     instructions: "You are a senior engineer. Write correct code in fenced blocks, then explain briefly in Arabic.",
+                     icon: "terminal", tools: ["calculator", "notes_add", "notes_search", "image_text", "workspace_write"],
+                     maxSteps: 6, builtIn: true),
+        AgentPackage(id: "builder", name: "بنّاء المشاريع", summary: "ينشئ هيكل مشروع كامل ويصدّره ZIP",
+                     instructions: """
+                     أنت مهندس برمجيات. أنشئ هيكل المشروع في مساحة العمل عبر workspace_mkdir و workspace_write، \
+                     اكتب ملفات كاملة، ثم اذكر شجرة الملفات. لا تدّعي أنك جمّعت المشروع.
                      """,
                      icon: "hammer", tools: ["workspace_*", "run_javascript", "notes_add"], maxSteps: 14, builtIn: true),
-        AgentPackage(id: "researcher3", name: "باحث موثّق", summary: "بحث ويب متعدد المصادر مع مراجع",
-                     instructions: "ابحث بثلاث صيغ، اقرأ المصادر كاملة، ثم اكتب تقريراً بمراجع مرقمة.",
-                     icon: "sparkle.magnifyingglass", tools: ["web_search", "fetch_url", "workspace_write", "notes_add"],
-                     maxSteps: 14, allowNetwork: true, builtIn: true),
-        AgentPackage(id: "analyst3", name: "محلل بيانات", summary: "تحليل عبر JavaScript مع جداول",
-                     instructions: "لا تحسب ذهنياً. نفّذ الكود، اطبع النتائج، وفسّرها في جدول Markdown.",
-                     icon: "chart.xyaxis.line", tools: ["run_javascript", "calculator", "workspace_read", "workspace_write"],
-                     maxSteps: 10, builtIn: true),
-        AgentPackage(id: "finance3", name: "المستشار المالي", summary: "زكاة وضريبة ونهاية خدمة",
-                     instructions: "استخدم أدوات الحساب فقط، واذكر المرجع الرسمي في كل إجابة مالية.",
-                     icon: "banknote", tools: ["zakat", "vat", "end_of_service", "calculator", "hijri_date"],
-                     maxSteps: 8, builtIn: true),
     ]
-}
