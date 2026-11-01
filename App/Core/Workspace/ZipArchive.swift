@@ -18,7 +18,7 @@ public enum ZipError: LocalizedError {
 }
 
 public enum ZipWriter {
-    public static func write(entries: [(path: String, data: Data)], to url: URL, root: String? = nil) throws {
+    public static func write(entries: [(String, Data)], to url: URL, root: String? = nil) throws {
         guard !entries.isEmpty else { throw ZipError.empty }
         var out = Data()
         var central = Data()

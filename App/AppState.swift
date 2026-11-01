@@ -100,6 +100,8 @@ final class AppState: ObservableObject {
         migrateLegacyAgentsIfNeeded()
     }
 
+    var engineReady: Bool { isReady(settings.defaultModelRef) }
+
     // MARK: Agents (3.0 packages are the source of truth)
 
     var agents: [AgentProfile] { packages.map { $0.profile() } }
