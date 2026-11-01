@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(JavaScriptCore)
+import JavaScriptCore
+#endif
 
 public enum UserToolKind: String, Codable, CaseIterable, Identifiable, Sendable {
     case javascript, http, workflow
