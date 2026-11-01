@@ -7,6 +7,7 @@ struct ModelsView: View {
     @EnvironmentObject var settings: AppSettings
     @State private var segment = 0
     @State private var importing = false
+    @State private var showHub = false
 
     var ram: String { Int64(ModelManager.physicalMemory).fileSize }
 
@@ -30,6 +31,7 @@ struct ModelsView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
+                        Button { showHub = true } label: { Label("مكتبة Hugging Face", systemImage: "globe") }
                         Button { importing = true } label: { Label("استيراد GGUF من الملفات", systemImage: "square.and.arrow.down") }
                         Button(role: .destructive) { models.cleanPartialDownloads() } label: { Label("تنظيف التحميلات الناقصة", systemImage: "trash") }
                         if state.engineReady {
@@ -43,6 +45,7 @@ struct ModelsView: View {
                     do { try models.importModel(from: url) } catch { models.lastError = error.localizedDescription }
                 }
             }
+            .sheet(isPresented: $showHub) { ModelHubView() }
             .onAppear { if models.installed.isEmpty { segment = 1 } }
         }
     }

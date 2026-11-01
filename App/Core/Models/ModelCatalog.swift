@@ -30,6 +30,31 @@ public enum ModelBadge: String, Codable, CaseIterable, Sendable {
     }
 }
 
+
+public enum ModelKind: String, Codable, CaseIterable, Identifiable, Sendable {
+    case chat, reasoning, code, arabic
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .chat: return "محادثة"
+        case .reasoning: return "تفكير"
+        case .code: return "برمجة"
+        case .arabic: return "عربي"
+        }
+    }
+
+    public var icon: String {
+        switch self {
+        case .chat: return "bubble.left.and.bubble.right"
+        case .reasoning: return "brain"
+        case .code: return "chevron.left.forwardslash.chevron.right"
+        case .arabic: return "character.book.closed.ar"
+        }
+    }
+}
+
 public struct ModelInfo: Codable, Identifiable, Equatable, Hashable, Sendable {
     public var id: String
     public var name: String
@@ -44,9 +69,14 @@ public struct ModelInfo: Codable, Identifiable, Equatable, Hashable, Sendable {
     public var license: String
     /// True for models the user imported from Files.
     public var isLocalImport: Bool = false
+    /// What the model is best at — used for filtering the library.
+    public var kind: ModelKind = .chat
+    /// Path inside the repo when it differs from the on-disk filename (nested folders).
+    public var remotePath: String?
 
     public var downloadURL: URL {
-        URL(string: "https://huggingface.co/\(repo)/resolve/main/\(file)?download=true")!
+        let path = (remotePath ?? file).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? file
+        return URL(string: "https://huggingface.co/\(repo)/resolve/main/\(path)?download=true")!
     }
 
     public var fileName: String { file }
@@ -56,10 +86,12 @@ public struct ModelInfo: Codable, Identifiable, Equatable, Hashable, Sendable {
 
     public init(id: String, name: String, publisher: String, summary: String, repo: String, file: String,
                 sizeBytes: Int64, parameters: String, contextLength: Int, badges: [ModelBadge], license: String,
-                isLocalImport: Bool = false) {
+                isLocalImport: Bool = false, kind: ModelKind = .chat, remotePath: String? = nil) {
         self.id = id; self.name = name; self.publisher = publisher; self.summary = summary; self.repo = repo
         self.file = file; self.sizeBytes = sizeBytes; self.parameters = parameters; self.contextLength = contextLength
         self.badges = badges; self.license = license; self.isLocalImport = isLocalImport
+        self.kind = kind
+        self.remotePath = remotePath
     }
 }
 
@@ -79,7 +111,7 @@ public enum ModelCatalog {
                   summary: "نموذج سعودي من الهيئة السعودية للبيانات والذكاء الاصطناعي، مدرّب بعمق على العربية والثقافة السعودية. للأجهزة ذات 8GB رام.",
                   repo: "bartowski/ALLaM-AI_ALLaM-7B-Instruct-preview-GGUF", file: "ALLaM-AI_ALLaM-7B-Instruct-preview-Q4_K_M.gguf",
                   sizeBytes: 4_220_000_000, parameters: "7B", contextLength: 4096,
-                  badges: [.saudi, .arabic], license: "Apache-2.0"),
+                  badges: [.saudi, .arabic], license: "Apache-2.0", kind: .arabic),
         ModelInfo(id: "gemma3-4b", name: "Gemma 3 4B", publisher: "Google",
                   summary: "عربي ممتاز وكتابة طبيعية، مناسب للتلخيص والترجمة.",
                   repo: "ggml-org/gemma-3-4b-it-GGUF", file: "gemma-3-4b-it-Q4_K_M.gguf",
@@ -105,6 +137,16 @@ public enum ModelCatalog {
                   repo: "Qwen/Qwen2.5-0.5B-Instruct-GGUF", file: "qwen2.5-0.5b-instruct-q8_0.gguf",
                   sizeBytes: 676_000_000, parameters: "0.5B", contextLength: 32768,
                   badges: [.fast, .arabic], license: "Apache-2.0"),
+        ModelInfo(id: "qwen3-8b", name: "Qwen3 8B", publisher: "Alibaba Qwen",
+                  summary: "الأقوى في هذا الكتالوج. يحتاج 8GB رام أو أكثر، وقد يكون بطيئاً على الأجهزة القديمة.",
+                  repo: "Qwen/Qwen3-8B-GGUF", file: "Qwen3-8B-Q4_K_M.gguf",
+                  sizeBytes: 5_027_783_488, parameters: "8B", contextLength: 32768,
+                  badges: [.tools, .thinking, .multilingual], license: "Apache-2.0", kind: .reasoning),
+        ModelInfo(id: "qwen2.5-coder-7b", name: "Qwen2.5 Coder 7B", publisher: "Alibaba Qwen",
+                  summary: "متخصص في البرمجة وتوليد المشاريع. يحتاج 8GB رام.",
+                  repo: "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF", file: "qwen2.5-coder-7b-instruct-q4_k_m.gguf",
+                  sizeBytes: 4_683_073_536, parameters: "7B", contextLength: 32768,
+                  badges: [.coder, .tools], license: "Apache-2.0", kind: .code),
     ]
 
     public static func model(id: String) -> ModelInfo? { models.first { $0.id == id } }
