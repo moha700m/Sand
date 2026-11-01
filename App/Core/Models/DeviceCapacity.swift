@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(os)
+import os
+#endif
 #if canImport(Darwin)
 import Darwin
 #endif
