@@ -153,7 +153,7 @@ struct HomeView: View {
                         Image(systemName: "bubble.left").foregroundStyle(.secondary)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(c.title).font(.footnote.weight(.medium)).lineLimit(1)
-                            Text(c.messages.last?.content.prefix(70) ?? "").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                            Text(String(c.messages.last?.content.prefix(70) ?? "")).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                         }
                         Spacer()
                     }

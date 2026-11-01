@@ -88,7 +88,9 @@ public enum WorkspaceTools {
             name: "workspace_zip", title: "تصدير ZIP", icon: "archivebox",
             description: "Package the workspace into a ZIP file in the app's temporary folder."))) { _ in
             let url = try store.exportZip(context.agentID)
-            return "تم إنشاء الأرشيف: \(url.lastPathComponent) (\(ByteCountFormatter.string(fromByteCount: (try? Data(contentsOf: url).count).map(Int64.init) ?? 0, countStyle: .file)))"
+            let bytes = (try? Data(contentsOf: url).count) ?? 0
+            let size = ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+            return "تم إنشاء الأرشيف: \(url.lastPathComponent) (\(size))"
         })
     }
 }

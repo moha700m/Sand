@@ -79,9 +79,11 @@ public enum PermissionManager {
             if policy.allowNetwork { return nil }
             return "هذا الوكيل يعمل دون شبكة. فعّل الشبكة من إعدادات الوكيل للسماح بـ \(spec.title)."
         case .writeLocal:
-            return policy.allowFileWrite ? nil : "الكتابة على الملفات معطّلة لهذا الوكيل."
+            if policy.allowFileWrite { return nil }
+            return "الكتابة على الملفات معطّلة لهذا الوكيل."
         case .system:
-            return policy.allowSystemActions ? nil : "هذا الوكيل لا يملك صلاحية تعديل بيانات النظام."
+            if policy.allowSystemActions { return nil }
+            return "هذا الوكيل لا يملك صلاحية تعديل بيانات النظام."
         case .readLocal:
             return nil
         }
