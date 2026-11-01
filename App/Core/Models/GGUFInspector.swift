@@ -22,7 +22,9 @@ public struct GGUFInfo: Equatable, Sendable {
     /// Non-fatal: the header is valid, but the metadata could not be fully read.
     public var warnings: [String] = []
 
-    public var isUsable: Bool { problems.isEmpty && isComplete }
+    /// Only header-level damage blocks loading. Metadata is optional for us,
+    /// so a model whose metadata cannot be fully read still loads.
+    public var isUsable: Bool { problems.isEmpty }
 
     public var summary: String {
         var parts: [String] = []
