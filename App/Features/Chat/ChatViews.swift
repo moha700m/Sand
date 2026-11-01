@@ -72,11 +72,6 @@ struct ChatView: View {
                             Button { vm.setPersona(p) } label: { Label(p.name, systemImage: vm.persona.id == p.id ? "checkmark" : p.icon) }
                         }
                     }
-                    Section("وكيل محدد") {
-                        ForEach(state.agents) { a in
-                            Button { vm.setAgent(a.id) } label: { Label(a.name, systemImage: vm.agent?.id == a.id ? "checkmark" : a.icon) }
-                        }
-                    }
                     Section {
                         ShareLink(item: vm.exportText) { Label("تصدير المحادثة (Markdown)", systemImage: "square.and.arrow.up") }
                         Button { vm.regenerate() } label: { Label("إعادة توليد آخر رد", systemImage: "arrow.clockwise") }
@@ -120,30 +115,37 @@ struct ChatView: View {
     }
 
     var emptyState: some View {
-        VStack(spacing: 18) {
-            OrbView(size: 92).padding(.top, 36)
-            Text(greeting).font(.system(size: 30, weight: .bold, design: .rounded))
-            Text(vm.mode == .research ? "أبحث في الويب وأقرأ المصادر وأكتب لك تقريراً موثّقاً"
-                 : vm.mode == .agent ? "أعطني مهمة وأنفّذها خطوة بخطوة بالأدوات"
-                 : "كيف أقدر أساعدك اليوم؟")
-                .font(.title3).foregroundStyle(.secondary).multilineTextAlignment(.center)
+        VStack(spacing: 20) {
+            OrbView(size: 84).padding(.top, 28)
+
+            VStack(spacing: 6) {
+                Text(greeting).font(.system(size: 32, weight: .bold))
+                Text(vm.mode == .research ? "أبحث في الويب وأقرأ المصادر وأكتب لك تقريراً موثّقاً"
+                     : vm.mode == .agent ? "أعطني مهمة وأنفّذها خطوة بخطوة"
+                     : "كيف أقدر أساعدك اليوم؟")
+                    .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            }
+
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 ForEach(suggestions, id: \.text) { s in
                     Button { vm.setMode(s.mode); vm.send(s.text) } label: {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Image(systemName: s.icon).font(.title3).foregroundStyle(.tint)
-                            Text(s.text).font(.footnote).multilineTextAlignment(.leading).lineLimit(3)
+                        VStack(alignment: .leading, spacing: 10) {
+                            IconTile(icon: s.icon, color: Color("AccentColor"), size: 28)
+                            Text(s.text).font(.footnote.weight(.medium))
+                                .foregroundStyle(.primary)
+                                .multilineTextAlignment(.leading)
+                                .lineLimit(3)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .padding(12)
-                        .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.primary.opacity(0.06)))
+                        .padding(14)
+                        .frame(maxWidth: .infinity, minHeight: 106, alignment: .topLeading)
+                        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.hairline))
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.top, 8)
+            .padding(.top, 4)
         }
         .frame(maxWidth: .infinity)
     }
@@ -152,9 +154,9 @@ struct ChatView: View {
 
     var suggestions: [Suggestion] {
         [Suggestion(icon: "sparkle.magnifyingglass", text: "ابحث لي عن آخر أخبار الذكاء الاصطناعي في السعودية واكتب تقرير", mode: .research),
-         Suggestion(icon: "chart.bar.xaxis", text: "احسب أقساط قرض 300 ألف على 5 سنوات بفائدة 4% واعرضها في جدول", mode: .agent),
+         Suggestion(icon: "chart.bar.xaxis", text: "احسب أقساط قرض 300 ألف على 5 سنوات بفائدة 4% واعرضها في جدول", mode: .chat),
          Suggestion(icon: "globe", text: "صمّم لي صفحة هبوط HTML لمقهى سعودي بألوان دافئة", mode: .chat),
-         Suggestion(icon: "moon.stars", text: "متى صلاة المغرب في جدة اليوم وكم باقي على رمضان؟", mode: .agent)]
+         Suggestion(icon: "moon.stars", text: "متى صلاة المغرب في جدة اليوم وكم باقي على رمضان؟", mode: .chat)]
     }
 
     // MARK: Composer
@@ -174,25 +176,26 @@ struct ChatView: View {
                     .font(.footnote).foregroundStyle(.secondary).lineLimit(2)
             }
             VStack(spacing: 6) {
-                TextField(vm.mode == .chat ? "اسأل سَنَد…" : vm.mode == .agent ? "اطلب مهمة من الوكيل…" : "عن ماذا أبحث؟",
+                TextField(vm.mode == .research ? "عن ماذا أبحث؟" : "اسأل سَنَد…",
                           text: $vm.input, axis: .vertical)
-                    .lineLimit(1...8)
-                    .padding(.horizontal, 6).padding(.top, 6)
+                    .lineLimit(1...7)
+                    .font(.body)
+                    .padding(.horizontal, 8).padding(.top, 8)
                 HStack(spacing: 10) {
                     Menu {
                         Button { showCamera = true } label: { Label("الكاميرا", systemImage: "camera") }
                         Button { showPhotos = true } label: { Label("الصور", systemImage: "photo.on.rectangle") }
                         Button { showFiles = true } label: { Label("ملف (PDF / نص / كود)", systemImage: "doc") }
                     } label: {
-                        Image(systemName: "plus").font(.system(size: 17, weight: .semibold))
-                            .frame(width: 34, height: 34).background(Color.primary.opacity(0.06), in: Circle())
+                        Image(systemName: "plus").font(.system(size: 16, weight: .semibold))
+                            .frame(width: 34, height: 34).background(Color.primary.opacity(0.05), in: Circle())
                     }
-                    ForEach([ChatMode.agent, .research], id: \.self) { m in
+                    ForEach([ChatMode.research], id: \.self) { m in
                         Button { vm.setMode(vm.mode == m ? .chat : m) } label: {
                             Label(m.title, systemImage: m.icon).font(.caption.weight(.semibold))
-                                .padding(.horizontal, 10).frame(height: 32)
-                                .background(vm.mode == m ? settings.accentColor.opacity(0.18) : Color.primary.opacity(0.06), in: Capsule())
-                                .foregroundStyle(vm.mode == m ? settings.accentColor : .primary)
+                                .padding(.horizontal, 10).frame(height: 30)
+                                .background(vm.mode == m ? settings.accentColor.opacity(0.16) : Color.primary.opacity(0.05), in: Capsule())
+                                .foregroundStyle(vm.mode == m ? settings.accentColor : Color.primary)
                         }
                         .buttonStyle(.plain)
                     }
@@ -206,10 +209,10 @@ struct ChatView: View {
                     sendButton
                 }
             }
-            .padding(10)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(Color.primary.opacity(0.08)))
-            .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+            .padding(8)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.hairline))
+            .shadow(color: .black.opacity(0.04), radius: 10, y: 3)
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 6)
@@ -454,7 +457,7 @@ struct OrbView: View {
 
 struct ChatBackground: View {
     var body: some View {
-        LinearGradient(colors: [Color("AccentColor").opacity(0.06), Color(.systemBackground), Color(.systemBackground)],
+        LinearGradient(colors: [Color("AccentColor").opacity(0.05), Color(.systemBackground), Color(.systemBackground)],
                        startPoint: .top, endPoint: .bottom)
             .ignoresSafeArea()
     }

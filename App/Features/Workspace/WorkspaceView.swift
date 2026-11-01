@@ -58,7 +58,7 @@ struct WorkspaceView: View {
 
             Section("الملفات") {
                 if nodes.isEmpty && error == nil {
-                    Text("لا ملفات بعد. أنشئ ملفاً أو اطلب من وكيل الكتابة إنشاء مشروع.")
+                    Text("لا ملفات بعد. أنشئ ملفاً أو اطلب من سَنَد إنشاء مشروع.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 ForEach(nodes) { node in

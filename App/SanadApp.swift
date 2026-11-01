@@ -8,7 +8,6 @@ struct SanadApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(state)
-                .environmentObject(state.runner)
                 .environmentObject(state.settings)
                 .environmentObject(state.models)
                 .environment(\.layoutDirection, .rightToLeft)
@@ -24,9 +23,6 @@ struct RootView: View {
 
     var body: some View {
         TabView(selection: $state.tab) {
-            HomeView()
-                .tabItem { Label("الرئيسية", systemImage: "house.fill") }
-                .tag(AppTab.home)
             ChatHomeView()
                 .tabItem { Label("المحادثة", systemImage: "bubble.left.fill") }
                 .tag(AppTab.chat)
@@ -74,7 +70,7 @@ struct ToolConfirmationSheet: View {
                 .font(.system(size: 44))
                 .foregroundStyle(.tint)
                 .padding(.top, 24)
-            Text("الوكيل يطلب الإذن").font(.title2.bold())
+            Text("سَنَد يطلب الإذن").font(.title2.bold())
             Text("يريد تنفيذ: \(pending.spec.title)").font(.headline)
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(pending.arguments.keys.sorted(), id: \.self) { k in

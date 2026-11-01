@@ -239,7 +239,7 @@ struct MemoryView: View {
             Section {
                 Toggle("تفعيل الذاكرة", isOn: $settings.memoryEnabled)
             } footer: {
-                Text("سَنَد يتذكر معلومات عنك عبر المحادثات (يحفظها الوكيل عندما تذكرها، أو تضيفها أنت). كل شيء محفوظ على جهازك.")
+                Text("سَنَد يتذكر معلومات عنك عبر المحادثات (يحفظها عندما تذكرها، أو تضيفها أنت). كل شيء محفوظ على جهازك.")
             }
             Section("تعليمات مخصصة") {
                 TextEditor(text: $settings.customInstructions).frame(minHeight: 110)

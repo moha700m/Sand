@@ -16,6 +16,7 @@ struct ModelsView: View {
     @State private var searchError: String?
     @State private var searchTask: Task<Void, Never>?
     @State private var importing = false
+    @State private var loadingPopular = false
 
     @State private var showLink = false
     @State private var link = ""
@@ -86,7 +87,7 @@ struct ModelsView: View {
                 }
             }
             .sheet(isPresented: $showLink) { linkSheet }
-            .task { if popular.isEmpty { await loadPopular() } }
+            .refreshable { await loadPopular() }
         }
     }
 
@@ -95,9 +96,8 @@ struct ModelsView: View {
     @ViewBuilder var statusSection: some View {
         Section {
             HStack(spacing: 12) {
-                Image(systemName: state.engineReady ? "bolt.horizontal.circle.fill" : "cpu")
-                    .font(.title2)
-                    .foregroundStyle(state.engineReady ? Color.green : Color.secondary)
+                IconTile(icon: state.engineReady ? "cpu.fill" : "cpu",
+                         color: state.engineReady ? .green : .gray, size: 34)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(state.engineReady ? (models.activeModel?.name ?? "نموذج محلي") : "لا يوجد نموذج محمّل")
                         .font(.headline)
@@ -206,21 +206,36 @@ struct ModelsView: View {
     @ViewBuilder var popularSection: some View {
         Section {
             if popular.isEmpty {
-                HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text("أقرأ الأكثر تنزيلاً من Hugging Face…").font(.footnote).foregroundStyle(.secondary)
+                Button { Task { await loadPopular() } } label: {
+                    HStack(spacing: 12) {
+                        IconTile(icon: "globe", color: .blue)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(loadingPopular ? "أقرأ من Hugging Face…" : "استكشف الأكثر تنزيلاً")
+                                .font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                            Text("بحث الإنترنت عن نماذج جديدة")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if loadingPopular {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "chevron.left").font(.caption2).foregroundStyle(.tertiary)
+                        }
+                    }
+                    .padding(.vertical, 2)
                 }
+                .buttonStyle(.plain)
+                .disabled(loadingPopular)
             } else {
-                ForEach(popular.prefix(8)) { repo in
+                ForEach(popular.prefix(6)) { repo in
                     NavigationLink(value: repo) { HFRepoRow(repo: repo) }
+                }
+                Button { Task { await loadPopular() } } label: {
+                    Label("تحديث الاكتشاف", systemImage: "arrow.clockwise").font(.footnote)
                 }
             }
         } header: {
-            HStack {
-                Text("على Hugging Face")
-                Spacer()
-                Text("بحث الإنترنت").font(.caption2).foregroundStyle(.secondary)
-            }
+            Text("على Hugging Face")
         } footer: {
             Text("اكتب في البحث أعلاه للوصول إلى آلاف النماذج، ثم اختر ملف GGUF يناسب ذاكرة جهازك.")
                 .font(.caption2)
@@ -404,6 +419,9 @@ struct ModelsView: View {
     }
 
     func loadPopular() async {
+        guard !loadingPopular else { return }
+        loadingPopular = true
+        defer { loadingPopular = false }
         do {
             let results = try await HuggingFaceHub.search("", limit: 14)
             if !results.isEmpty { popular = results }
@@ -428,9 +446,12 @@ struct InstalledModelRow: View {
             NavigationLink {
                 ModelDetailView(ref: model.id, displayName: model.name)
             } label: {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(model.name).font(.headline)
-                    Text("\(model.publisher) · \(model.sizeBytes.fileSize)").font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 10) {
+                    IconTile(icon: "cpu", color: .indigo, size: 30)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(model.name).font(.headline)
+                        Text("\(model.publisher) · \(model.sizeBytes.fileSize)").font(.caption).foregroundStyle(.secondary)
+                    }
                 }
             }
             Spacer()

@@ -117,8 +117,7 @@ struct SettingsView: View {
                 Toggle("وضع التفكير (Qwen3)", isOn: $gen.enableThinking)
                 Toggle("إخفاء خطوات التفكير", isOn: $gen.hideThinking)
             }
-            Section("الوكلاء") {
-                Stepper("أقصى خطوات للوكيل: \(settings.agentMaxSteps)", value: $settings.agentMaxSteps, in: 2...12)
+            Section("البحث") {
                 Toggle(isOn: $settings.webAccess) {
                     VStack(alignment: .leading) {
                         Text("السماح بالبحث في الويب")
@@ -146,7 +145,7 @@ struct SettingsView: View {
             Section {
                 Button("مسح كل البيانات", role: .destructive) { confirmWipe = true }
             } header: { Text("الخصوصية") } footer: {
-                Text("يحذف المحادثات والمستندات والملاحظات والوكلاء المخصصين والمفاتيح. النماذج المحمّلة تبقى ويمكن حذفها من تبويب النماذج.")
+                Text("يحذف المحادثات والمستندات والملاحظات والمهارات والأدوات والمفاتيح. النماذج المحمّلة تبقى ويمكن حذفها من تبويب النماذج.")
             }
             Section("حول") {
                 LabeledContent("الإصدار", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0")
@@ -168,7 +167,7 @@ struct OnboardingView: View {
 
     let pages: [(String, String, String)] = [
         ("sparkles", "أهلاً بك في سَنَد", "ذكاء اصطناعي يعمل على جهازك بالكامل. محادثاتك ومستنداتك لا تغادر الآيفون."),
-        ("wand.and.stars", "وكلاء ينفّذون عنك", "الوكيل يخطط ويستخدم الأدوات خطوة بخطوة: تذكيرات، مواعيد، مستنداتك، حسابات دقيقة — وبموافقتك."),
+        ("bolt.fill", "خفيف وسريع", "افتح، اكتب، واحصل على الجواب. بحث في الويب عند الحاجة، وأدوات دقيقة عند الطلب."),
         ("star.circle", "بهوية سعودية", "التقويم الهجري (أم القرى)، مواقيت الصلاة، الزكاة، ضريبة 15%، نهاية الخدمة، ونموذج ALLaM السعودي."),
         ("cpu", "اختر نموذجك", "حمّل نموذجاً مرة واحدة واستخدمه بدون إنترنت. ننصح بالبدء بـ Qwen3 1.7B."),
     ]

@@ -1,84 +1,64 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Everything that does not need its own tab, in one short list.
-/// Each entry is a real destination; nothing here is decorative.
+/// Everything that is not the chat or the models: a short, grouped list.
 enum MoreRoute: String, Hashable, CaseIterable {
-    case agents, tools, skills, workspace, arena, lens
-    case knowledge, notes, memory
-    case providers, mcp, server
-    case saudi, settings
+    case settings, memory
+    case knowledge, notes, workspace
+    case lens, tools, skills, saudi
+    case providers, mcp, server, arena
 }
 
 struct MoreView: View {
     @EnvironmentObject var state: AppState
     @EnvironmentObject var models: ModelManager
-    @EnvironmentObject var runner: AgentRunner
     @State private var path = NavigationPath()
 
     var body: some View {
         NavigationStack(path: $path) {
-            ScrollView {
-                VStack(spacing: 16) {
-                    statusCard
+            List {
+                Section { modelRow }
 
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                        NavigationLink(value: MoreRoute.tools) {
-                            MoreTile(icon: "hammer.fill", color: .pink, title: "الأدوات",
-                                     subtitle: "\(state.userTools.all.count) منشأة")
-                        }
-                        NavigationLink(value: MoreRoute.skills) {
-                            MoreTile(icon: "books.vertical.fill", color: .teal, title: "المهارات",
-                                     subtitle: "\(state.skills.all.count) مهارة")
-                        }
-                        NavigationLink(value: MoreRoute.workspace) {
-                            MoreTile(icon: "folder.fill", color: .orange, title: "مساحة العمل",
-                                     subtitle: state.workspace.totalBytes(state.workspaceContext.agentID).fileSize)
-                        }
-                        NavigationLink(value: MoreRoute.arena) {
-                            MoreTile(icon: "trophy.fill", color: .yellow, title: "الساحة",
-                                     subtitle: "مقارنة أ/ب")
-                        }
-                        NavigationLink(value: MoreRoute.lens) {
-                            MoreTile(icon: "camera.viewfinder", color: .cyan, title: "العدسة",
-                                     subtitle: "نص من صورة")
-                        }
-                        NavigationLink(value: MoreRoute.agents) {
-                            MoreTile(icon: "wand.and.stars", color: .purple, title: "الوكلاء",
-                                     subtitle: runner.activeJobs.isEmpty ? "مهام في الخلفية" : "\(runner.activeJobs.count) مهمة جارية")
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    group("بياناتك", [
-                        (.knowledge, "doc.text.magnifyingglass", .indigo, "قاعدة المعرفة", "\(state.knowledge.documents.count) مستند"),
-                        (.notes, "note.text", .yellow, "الملاحظات", "\(state.notes.notes.count) ملاحظة"),
-                        (.memory, "brain.head.profile", .pink, "الذاكرة والتخصيص", "\(state.memory.all.count) ذكرى"),
-                    ])
-
-                    group("التشغيل", [
-                        (.providers, "cloud.bolt.fill", .indigo, "مزودو السحابة", state.providers.isEmpty ? "لم يُضف مزود" : "\(state.providers.count) مزود"),
-                        (.mcp, "puzzlepiece.extension.fill", .purple, "خوادم MCP", "\(state.mcp.servers.filter(\.enabled).count) مفعّل"),
-                        (.server, "server.rack", .blue, "خادم API المحلي", state.server.isRunning ? "يعمل" : "متوقف"),
-                    ])
-
-                    group("عام", [
-                        (.saudi, "star.circle.fill", .green, "أدوات سعودية", "هجري · صلاة · زكاة · نهاية خدمة"),
-                        (.settings, "gearshape.fill", .gray, "الإعدادات", "النموذج، المظهر، الخصوصية"),
-                    ])
-
-                    VStack(spacing: 4) {
-                        Text("سَنَد AI").font(.footnote.weight(.semibold))
-                        Text("ذكاء اصطناعي محلي وسحابي بهوية سعودية. لا حساب ولا تحليلات.")
-                            .font(.caption2).foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(.top, 8)
+                Section("المساعد") {
+                    link(.settings, "gearshape.fill", .gray, "الإعدادات", "النموذج، المظهر، الخصوصية")
+                    link(.memory, "brain.head.profile", .pink, "الذاكرة والتخصيص", "\(state.memory.all.count) ذكرى")
                 }
-                .padding()
-                .padding(.bottom, 20)
+
+                Section("بياناتك") {
+                    link(.knowledge, "doc.text.magnifyingglass", .orange, "قاعدة المعرفة", "\(state.knowledge.documents.count) مستند")
+                    link(.notes, "note.text", .yellow, "الملاحظات", "\(state.notes.notes.count) ملاحظة")
+                    link(.workspace, "folder.fill", .green, "مساحة العمل",
+                         state.workspace.totalBytes(state.workspaceContext.agentID).fileSize)
+                }
+
+                Section("أدوات") {
+                    link(.lens, "camera.viewfinder", .cyan, "العدسة", "اقرأ نصاً من صورة")
+                    link(.tools, "hammer.fill", .indigo, "الأدوات", "\(state.userTools.all.count) أداة منشأة")
+                    link(.skills, "books.vertical.fill", .teal, "المهارات", "\(state.skills.all.count) مهارة")
+                    link(.saudi, "star.circle.fill", .mint, "أدوات سعودية", "هجري · صلاة · زكاة")
+                }
+
+                Section("متقدم") {
+                    link(.providers, "cloud.bolt.fill", .blue, "مزودو السحابة",
+                         state.providers.isEmpty ? "لم يُضف مزود" : "\(state.providers.count) مزود")
+                    link(.mcp, "puzzlepiece.extension.fill", .purple, "خوادم MCP",
+                         "\(state.mcp.servers.filter(\.enabled).count) مفعّل")
+                    link(.server, "server.rack", .gray, "خادم API المحلي", state.server.isRunning ? "يعمل" : "متوقف")
+                    link(.arena, "trophy.fill", .orange, "الساحة", "قارن بين نموذجين")
+                }
+
+                Section {
+                    HStack {
+                        Text("سَنَد AI").font(.footnote.weight(.semibold))
+                        Spacer()
+                        Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "3.1")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    Text("ذكاء اصطناعي محلي وسحابي بهوية سعودية. لا حساب ولا تحليلات.")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
             }
-            .background(Color(.systemGroupedBackground))
+            .listStyle(.insetGrouped)
             .navigationTitle("المزيد")
             .navigationDestination(for: MoreRoute.self) { destination($0) }
             .onAppear(perform: openDeepLink)
@@ -86,68 +66,33 @@ struct MoreView: View {
         }
     }
 
-    var statusCard: some View {
+    var modelRow: some View {
         Button { state.tab = .models } label: {
             HStack(spacing: 12) {
-                Image(systemName: state.engineReady ? "cpu.fill" : "cpu")
-                    .font(.title2)
-                    .foregroundStyle(state.engineReady ? Color.green : Color.secondary)
-                VStack(alignment: .leading, spacing: 3) {
+                IconTile(icon: state.engineReady ? "cpu.fill" : "cpu", color: state.engineReady ? .green : .gray, size: 34)
+                VStack(alignment: .leading, spacing: 2) {
                     Text(state.engineReady ? (models.activeModel?.name ?? "نموذج محلي") : "لا يوجد نموذج محمّل")
-                        .font(.headline).foregroundStyle(.primary)
-                    Text(state.engineReady ? "يعمل على الجهاز" : "اختر نموذجاً للبدء")
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                    Text(state.engineReady ? "يعمل على الجهاز" : "اضغط لاختيار نموذج")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(runner.activeJobs.count) مهمة جارية")
-                        .font(.caption2).foregroundStyle(runner.activeJobs.isEmpty ? Color.secondary : Color.accentColor)
-                    Text("\(models.installed.count) نموذج مثبّت")
-                        .font(.caption2).foregroundStyle(.secondary)
-                }
+                Text("\(models.installed.count) مثبّت").font(.caption2).foregroundStyle(.secondary)
+                Image(systemName: "chevron.left").font(.caption2).foregroundStyle(.tertiary)
             }
-            .padding(14)
-            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .padding(.vertical, 2)
         }
         .buttonStyle(.plain)
     }
 
-    func group(_ title: String, _ rows: [(MoreRoute, String, Color, String, String)]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
-                .padding(.leading, 4)
-            VStack(spacing: 0) {
-                ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
-                    NavigationLink(value: row.0) {
-                        HStack(spacing: 12) {
-                            Image(systemName: row.1)
-                                .foregroundStyle(.white)
-                                .frame(width: 30, height: 30)
-                                .background(row.2, in: RoundedRectangle(cornerRadius: 8))
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(row.3).foregroundStyle(.primary)
-                                Text(row.4).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.left")
-                                .font(.caption2).foregroundStyle(.tertiary)
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                    }
-                    .buttonStyle(.plain)
-                    if index < rows.count - 1 {
-                        Divider().padding(.leading, 56)
-                    }
-                }
-            }
-            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    func link(_ route: MoreRoute, _ icon: String, _ color: Color, _ title: String, _ subtitle: String? = nil) -> some View {
+        NavigationLink(value: route) {
+            SettingsRow(icon: icon, color: color, title: title, subtitle: subtitle)
         }
     }
 
     @ViewBuilder func destination(_ route: MoreRoute) -> some View {
         switch route {
-        case .agents: AgentBuilderView()
         case .tools: ToolsView()
         case .skills: SkillsView()
         case .workspace: WorkspaceView()
@@ -169,29 +114,6 @@ struct MoreView: View {
         state.deepLinkScreen = nil
         path = NavigationPath()
         path.append(route)
-    }
-}
-
-struct MoreTile: View {
-    let icon: String
-    let color: Color
-    let title: String
-    let subtitle: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Image(systemName: icon)
-                .foregroundStyle(.white)
-                .frame(width: 32, height: 32)
-                .background(color, in: RoundedRectangle(cornerRadius: 9))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.footnote.weight(.semibold)).foregroundStyle(.primary)
-                Text(subtitle).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 

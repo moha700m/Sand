@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 enum AppTab: String, CaseIterable {
-    case home, chat, models, more
+    case chat, models, more
 }
 
 /// App-wide settings persisted in UserDefaults.
@@ -43,14 +43,13 @@ final class AppSettings: ObservableObject {
 
 @MainActor
 final class AppState: ObservableObject {
-    @Published var tab: AppTab = .home
+    @Published var tab: AppTab = .chat
     @Published var deepLinkScreen: String?
     @Published var conversations: [Conversation] = []
     @Published var packages: [AgentPackage] = []
     @Published var pendingConfirmation: PendingConfirmation?
     @Published var lensHandoff: String?
     /// Deep link requested from Home or another screen.
-    @Published var pendingAgentID: String?
     @Published var pendingConversationID: UUID?
     /// Conversation list, opened from the chat tab or Home.
     @Published var showConversations = false
@@ -59,7 +58,6 @@ final class AppState: ObservableObject {
     var pendingAutoSend: String?
 
     let settings = AppSettings()
-    let runner = AgentRunner()
     let engine: LlamaEngine
     let models: ModelManager
     let registry = ToolRegistry()
@@ -102,7 +100,6 @@ final class AppState: ObservableObject {
         WorkspaceTools.register(into: registry, store: workspace, context: workspaceContext)
         userTools.registerAll(into: registry)
         AppStateHolder.shared = self
-        runner.attach(self)
         applyLaunchArguments()
         migrateLegacyAgentsIfNeeded()
     }
@@ -262,17 +259,6 @@ final class AppState: ObservableObject {
     }
 
     // MARK: Cross-tab navigation
-
-    func openAgent(_ id: String) {
-        pendingAgentID = id
-        openAgents()
-    }
-
-    /// Agents are no longer a tab; the studio lives under "المزيد".
-    func openAgents() {
-        deepLinkScreen = "agents"
-        tab = .more
-    }
 
     func openConversation(_ id: UUID) {
         pendingConversationID = id
