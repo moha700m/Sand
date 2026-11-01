@@ -1,8 +1,9 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Agents tab: pick an agent, give it a task, and forget about it.
-/// Runs live in `AgentRunner`, so leaving this tab does not stop them.
+/// Agent studio (opened from "المزيد"): pick an agent, give it a task, and
+/// forget about it. Runs live in `AgentRunner`, so leaving the screen does not
+/// stop them.
 struct AgentBuilderView: View {
     @EnvironmentObject var state: AppState
     @EnvironmentObject var runner: AgentRunner
@@ -11,7 +12,7 @@ struct AgentBuilderView: View {
     @State private var importing = false
     @State private var exportURL: URL?
     @State private var error: String?
-    @State private var path = NavigationPath()
+    @State private var routeAgent: AgentProfile?
 
     struct AgentRoute: Hashable { let id: String }
     struct JobRoute: Hashable { let id: UUID }
@@ -19,94 +20,95 @@ struct AgentBuilderView: View {
     var active: [AgentRunner.Job] { runner.activeJobs }
 
     var body: some View {
-        NavigationStack(path: $path) {
-            List {
-                if !active.isEmpty {
-                    Section("قيد التنفيذ الآن") {
-                        ForEach(active) { job in
-                            NavigationLink(value: JobRoute(id: job.id)) { AgentJobRow(job: job) }
-                        }
+        List {
+            if !active.isEmpty {
+                Section("قيد التنفيذ الآن") {
+                    ForEach(active) { job in
+                        NavigationLink(value: JobRoute(id: job.id)) { AgentJobRow(job: job) }
                     }
                 }
+            }
 
+            Section {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("مهمة واحدة، والباقي علينا", systemImage: "shippingbox.fill").font(.headline)
+                    Text("اختر وكيلاً واكتب المهمة. التشغيل يستمر في الخلفية حتى لو رجعت للرئيسية أو قفلت الشاشة، والنتيجة تُحفظ في المحادثات.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 4)
+            }
+
+            Section("الوكلاء (\(state.packages.count))") {
+                ForEach(state.packages) { pkg in
+                    NavigationLink(value: AgentRoute(id: pkg.id)) { agentRow(pkg) }
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) { state.deleteAgent(pkg.id) } label: {
+                                Label("حذف", systemImage: "trash")
+                            }
+                            Button { editing = pkg } label: { Label("تعديل", systemImage: "pencil") }
+                                .tint(.blue)
+                        }
+                        .contextMenu {
+                            Button { duplicate(pkg) } label: { Label("نسخة", systemImage: "plus.square.on.square") }
+                            Button { export(pkg) } label: { Label("تصدير حزمة", systemImage: "square.and.arrow.up") }
+                        }
+                }
+            }
+
+            if !runner.finishedJobs.isEmpty {
                 Section {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Label("مهمة واحدة، والباقي علينا", systemImage: "shippingbox.fill").font(.headline)
-                        Text("اختر وكيلاً واكتب المهمة. التشغيل يستمر في الخلفية حتى لو رجعت للرئيسية أو قفلت الشاشة، والنتيجة تُحفظ في المحادثات.")
-                            .font(.footnote).foregroundStyle(.secondary)
+                    ForEach(runner.finishedJobs.prefix(6)) { job in
+                        NavigationLink(value: JobRoute(id: job.id)) { AgentJobRow(job: job) }
                     }
-                    .padding(.vertical, 4)
+                    Button("مسح السجل") { runner.clearFinished() }
+                        .font(.footnote)
+                } header: {
+                    Text("آخر المهام")
                 }
+            }
 
-                Section("الوكلاء (\(state.packages.count))") {
-                    ForEach(state.packages) { pkg in
-                        NavigationLink(value: AgentRoute(id: pkg.id)) { agentRow(pkg) }
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) { state.deleteAgent(pkg.id) } label: {
-                                    Label("حذف", systemImage: "trash")
-                                }
-                                Button { editing = pkg } label: { Label("تعديل", systemImage: "pencil") }
-                                    .tint(.blue)
-                            }
-                            .contextMenu {
-                                Button { duplicate(pkg) } label: { Label("نسخة", systemImage: "plus.square.on.square") }
-                                Button { export(pkg) } label: { Label("تصدير حزمة", systemImage: "square.and.arrow.up") }
-                            }
-                    }
-                }
-
-                if !runner.finishedJobs.isEmpty {
-                    Section {
-                        ForEach(runner.finishedJobs.prefix(6)) { job in
-                            NavigationLink(value: JobRoute(id: job.id)) { AgentJobRow(job: job) }
-                        }
-                        Button("مسح السجل") { runner.clearFinished() }
-                            .font(.footnote)
-                    } header: {
-                        Text("آخر المهام")
-                    }
-                }
-
-                if let error {
-                    Section { Text(error).font(.footnote).foregroundStyle(.red) }
-                }
+            if let error {
+                Section { Text(error).font(.footnote).foregroundStyle(.red) }
             }
-            .navigationTitle("الوكلاء")
-            .toolbar {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button { importing = true } label: { Image(systemName: "square.and.arrow.down") }
-                    Button { newAgent() } label: { Image(systemName: "plus") }
-                }
-            }
-            .navigationDestination(for: AgentRoute.self) { route in
-                if let pkg = state.packages.first(where: { $0.id == route.id }) {
-                    AgentRunView(agent: pkg.profile())
-                } else {
-                    ContentUnavailableView("الوكيل غير موجود", systemImage: "questionmark.folder",
-                                           description: Text("ربما حُذف. ارجع للقائمة."))
-                }
-            }
-            .navigationDestination(for: JobRoute.self) { route in
-                AgentJobDetailView(jobID: route.id)
-            }
-            .sheet(item: $editing) { pkg in AgentEditor3(pkg: pkg) }
-            .fileImporter(isPresented: $importing, allowedContentTypes: [.zip, .folder]) { result in
-                if case .success(let url) = result {
-                    do {
-                        let pkg = try state.agentPackages.importPackage(from: url)
-                        state.packages = state.agentPackages.all
-                        editing = pkg
-                    } catch { self.error = error.localizedDescription }
-                }
-            }
-            .sheet(item: Binding(get: { exportURL.map { ExportTarget(url: $0) } },
-                                 set: { if $0 == nil { exportURL = nil } })) { target in
-                ShareSheet(url: target.url).presentationDetents([.medium])
-            }
-            .onAppear(perform: openPendingAgent)
-            .onChange(of: state.pendingAgentID) { _, _ in openPendingAgent() }
         }
-    }
+        .navigationTitle("الوكلاء")
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button { importing = true } label: { Image(systemName: "square.and.arrow.down") }
+                Button { newAgent() } label: { Image(systemName: "plus") }
+            }
+        }
+        .navigationDestination(for: AgentRoute.self) { route in
+            if let pkg = state.packages.first(where: { $0.id == route.id }) {
+                AgentRunView(agent: pkg.profile())
+            } else {
+                ContentUnavailableView("الوكيل غير موجود", systemImage: "questionmark.folder",
+                                       description: Text("ربما حُذف. ارجع للقائمة."))
+            }
+        }
+        .navigationDestination(item: $routeAgent) { profile in
+            AgentRunView(agent: profile)
+        }
+        .navigationDestination(for: JobRoute.self) { route in
+            AgentJobDetailView(jobID: route.id)
+        }
+        .sheet(item: $editing) { pkg in AgentEditor3(pkg: pkg) }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.zip, .folder]) { result in
+            if case .success(let url) = result {
+                do {
+                    let pkg = try state.agentPackages.importPackage(from: url)
+                    state.packages = state.agentPackages.all
+                    editing = pkg
+                } catch { self.error = error.localizedDescription }
+            }
+        }
+        .sheet(item: Binding(get: { exportURL.map { ExportTarget(url: $0) } },
+                             set: { if $0 == nil { exportURL = nil } })) { target in
+            ShareSheet(url: target.url).presentationDetents([.medium])
+        }
+        .onAppear(perform: openPendingAgent)
+        .onChange(of: state.pendingAgentID) { _, _ in openPendingAgent() }
+}
 
     struct ExportTarget: Identifiable { let id = UUID(); let url: URL }
 
@@ -156,9 +158,8 @@ struct AgentBuilderView: View {
     func openPendingAgent() {
         guard let id = state.pendingAgentID else { return }
         state.pendingAgentID = nil
-        guard state.packages.contains(where: { $0.id == id }) else { return }
-        path = NavigationPath()
-        path.append(AgentRoute(id: id))
+        guard let pkg = state.packages.first(where: { $0.id == id }) else { return }
+        routeAgent = pkg.profile()
     }
 }
 

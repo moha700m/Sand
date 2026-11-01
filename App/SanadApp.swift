@@ -27,12 +27,9 @@ struct RootView: View {
             HomeView()
                 .tabItem { Label("الرئيسية", systemImage: "house.fill") }
                 .tag(AppTab.home)
-            ConversationsView()
-                .tabItem { Label("المحادثات", systemImage: "bubble.left.and.bubble.right.fill") }
+            ChatHomeView()
+                .tabItem { Label("المحادثة", systemImage: "bubble.left.fill") }
                 .tag(AppTab.chat)
-            AgentBuilderView()
-                .tabItem { Label("الوكلاء", systemImage: "wand.and.stars") }
-                .tag(AppTab.agents)
             ModelsView()
                 .tabItem { Label("النماذج", systemImage: "cpu") }
                 .tag(AppTab.models)
@@ -63,9 +60,6 @@ struct RootView: View {
                 state.tab = .chat
                 state.pendingQuery = q
             }
-        }
-        .onChange(of: state.tab) { _, new in
-            if new == .lens { state.tab = .more; state.deepLinkScreen = "lens" }
         }
     }
 }

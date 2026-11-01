@@ -86,7 +86,7 @@ struct HomeView: View {
     @ViewBuilder var runningCard: some View {
         let jobs = runner.activeJobs
         if let first = jobs.first {
-            Button { state.tab = .agents } label: {
+            Button { state.openAgents() } label: {
                 HStack(spacing: 12) {
                     ProgressView().controlSize(.small)
                     VStack(alignment: .leading, spacing: 2) {
@@ -113,7 +113,7 @@ struct HomeView: View {
                 state.tab = .chat
             }
             action("النماذج", "cpu.fill", .indigo) { state.tab = .models }
-            action("الوكلاء", "wand.and.stars", .purple) { state.tab = .agents }
+            action("الوكلاء", "wand.and.stars", .purple) { state.openAgents() }
             action("مساحة العمل", "folder.fill", .orange) { state.tab = .more; state.deepLinkScreen = "workspace" }
             action("الأدوات", "hammer.fill", .pink) { state.tab = .more; state.deepLinkScreen = "tools" }
             action("MCP", "puzzlepiece.extension.fill", .blue) { state.tab = .more; state.deepLinkScreen = "mcp" }
@@ -141,7 +141,7 @@ struct HomeView: View {
             HStack {
                 Text("الوكلاء").font(.headline)
                 Spacer()
-                Button("عرض الكل") { state.tab = .agents }.font(.caption)
+                Button("عرض الكل") { state.openAgents() }.font(.caption)
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
@@ -168,7 +168,7 @@ struct HomeView: View {
             HStack {
                 Text("آخر المحادثات").font(.headline)
                 Spacer()
-                Button("الكل") { state.tab = .chat }.font(.caption)
+                Button("الكل") { state.tab = .chat; state.showConversations = true }.font(.caption)
             }
             if state.conversations.isEmpty {
                 Text("ابدأ محادثة — كل شيء يبقى على جهازك.")

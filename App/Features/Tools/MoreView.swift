@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 /// Everything that does not need its own tab, in one short list.
 /// Each entry is a real destination; nothing here is decorative.
 enum MoreRoute: String, Hashable, CaseIterable {
-    case tools, skills, workspace, arena, lens
+    case agents, tools, skills, workspace, arena, lens
     case knowledge, notes, memory
     case providers, mcp, server
     case saudi, settings
@@ -43,14 +43,15 @@ struct MoreView: View {
                             MoreTile(icon: "camera.viewfinder", color: .cyan, title: "العدسة",
                                      subtitle: "نص من صورة")
                         }
-                        NavigationLink(value: MoreRoute.knowledge) {
-                            MoreTile(icon: "doc.text.magnifyingglass", color: .indigo, title: "المعرفة",
-                                     subtitle: "\(state.knowledge.documents.count) مستند")
+                        NavigationLink(value: MoreRoute.agents) {
+                            MoreTile(icon: "wand.and.stars", color: .purple, title: "الوكلاء",
+                                     subtitle: runner.activeJobs.isEmpty ? "مهام في الخلفية" : "\(runner.activeJobs.count) مهمة جارية")
                         }
                     }
                     .buttonStyle(.plain)
 
                     group("بياناتك", [
+                        (.knowledge, "doc.text.magnifyingglass", .indigo, "قاعدة المعرفة", "\(state.knowledge.documents.count) مستند"),
                         (.notes, "note.text", .yellow, "الملاحظات", "\(state.notes.notes.count) ملاحظة"),
                         (.memory, "brain.head.profile", .pink, "الذاكرة والتخصيص", "\(state.memory.all.count) ذكرى"),
                     ])
@@ -146,6 +147,7 @@ struct MoreView: View {
 
     @ViewBuilder func destination(_ route: MoreRoute) -> some View {
         switch route {
+        case .agents: AgentBuilderView()
         case .tools: ToolsView()
         case .skills: SkillsView()
         case .workspace: WorkspaceView()

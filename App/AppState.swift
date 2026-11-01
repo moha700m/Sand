@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 enum AppTab: String, CaseIterable {
-    case home, chat, agents, models, lens, more
+    case home, chat, models, more
 }
 
 /// App-wide settings persisted in UserDefaults.
@@ -52,6 +52,8 @@ final class AppState: ObservableObject {
     /// Deep link requested from Home or another screen.
     @Published var pendingAgentID: String?
     @Published var pendingConversationID: UUID?
+    /// Conversation list, opened from the chat tab or Home.
+    @Published var showConversations = false
     /// Query handed in from Siri/Shortcuts; opened as a new chat.
     @Published var pendingQuery: String?
     var pendingAutoSend: String?
@@ -263,7 +265,13 @@ final class AppState: ObservableObject {
 
     func openAgent(_ id: String) {
         pendingAgentID = id
-        tab = .agents
+        openAgents()
+    }
+
+    /// Agents are no longer a tab; the studio lives under "المزيد".
+    func openAgents() {
+        deepLinkScreen = "agents"
+        tab = .more
     }
 
     func openConversation(_ id: UUID) {
