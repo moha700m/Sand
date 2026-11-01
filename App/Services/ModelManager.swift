@@ -44,6 +44,13 @@ final class ModelManager: NSObject, ObservableObject {
 
     static let physicalMemory = ProcessInfo.processInfo.physicalMemory
 
+    /// Free space that iOS is willing to give the app right now.
+    static func freeSpace() -> Int64 {
+        let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+        let values = try? home.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+        return values?.volumeAvailableCapacityForImportantUsage ?? 0
+    }
+
     init(engine: LlamaEngine) {
         self.engine = engine
         super.init()
@@ -137,9 +144,27 @@ final class ModelManager: NSObject, ObservableObject {
             let reason = info.problems.first ?? "الملف لا يبدأ بترويسة GGUF"
             throw ToolError("تعذّر استيراد \(url.lastPathComponent) (\(ByteCountFormatter.string(fromByteCount: info.fileSize, countStyle: .file))): \(reason)")
         }
+        let free = Self.freeSpace()
+        if free > 0, info.fileSize + 200_000_000 > free {
+            let f = ByteCountFormatter()
+            throw ToolError("المساحة غير كافية: الحجم \(f.string(fromByteCount: info.fileSize, countStyle: .file)) والمتاح \(f.string(fromByteCount: free, countStyle: .file)).")
+        }
+
         let dest = Self.modelsDirectory.appendingPathComponent(url.lastPathComponent)
         if FileManager.default.fileExists(atPath: dest.path) { try FileManager.default.removeItem(at: dest) }
-        try FileManager.default.copyItem(at: url, to: dest)
+
+        // Files from iCloud Drive and third-party providers need coordination;
+        // a plain copyItem can fail with "operation not permitted" while the
+        // placeholder is still being materialised.
+        var coordError: NSError?
+        var copyError: Error?
+        NSFileCoordinator().coordinate(readingItemAt: url, options: [.withoutChanges], error: &coordError) { readURL in
+            do { try FileManager.default.copyItem(at: readURL, to: dest) }
+            catch { copyError = error }
+        }
+        if let failure = coordError ?? copyError {
+            throw ToolError("فشل نسخ الملف من المزوّد: \(failure.localizedDescription)")
+        }
         refreshInstalled()
     }
 
