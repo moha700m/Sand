@@ -1,0 +1,96 @@
+name: Build Sanad AI 3.0
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: sanad3-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  LLAMA_TAG: b11960
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select newest Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode*.app | grep -vi beta | sort -V | tail -1)
+          echo "Using $XC"
+          sudo xcode-select -s "$XC/Contents/Developer"
+          xcodebuild -version
+      - name: Cache llama.xcframework
+        uses: actions/cache@v4
+        with:
+          path: Frameworks/device
+          key: llama-xcframework-${{ env.LLAMA_TAG }}
+      - name: Fetch llama.cpp XCFramework
+        run: ./scripts/fetch-llama.sh
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        run: xcodegen generate
+      - name: Pick simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)['devices']
+          pref=('iPhone 17 Pro','iPhone 16 Pro','iPhone 17','iPhone 16')
+          for want in pref:
+            for rt,devs in sorted(d.items(), reverse=True):
+              if 'iOS' not in rt: continue
+              for x in devs:
+                if x['name']==want: print(x['udid']); sys.exit()
+          for rt,devs in d.items():
+            if 'iOS' in rt:
+              for x in devs:
+                if x['name'].startswith('iPhone'): print(x['udid']); sys.exit()
+          ")
+          echo "udid=$UDID" >> $GITHUB_OUTPUT
+          xcrun simctl list devices | grep "$UDID"
+      - name: Unit tests
+        run: |
+          set +e
+          xcodebuild test -project SanadAI.xcodeproj -scheme SanadAI \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            CODE_SIGNING_ALLOWED=NO > test.log 2>&1
+          rc=$?
+          grep -E "error:|Test Case.*(passed|failed)|Executed|TEST (SUCCEEDED|FAILED)" test.log | tail -160
+          exit $rc
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-log
+          path: test.log
+      - name: Build unsigned IPA
+        run: |
+          set -o pipefail
+          xcodebuild archive -project SanadAI.xcodeproj -scheme SanadAI -configuration Release \
+            -destination "generic/platform=iOS" -archivePath build/SanadAI.xcarchive \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" | tail -40
+          rm -rf Payload && mkdir -p Payload
+          cp -R build/SanadAI.xcarchive/Products/Applications/SanadAI.app Payload/
+          A=Payload/SanadAI.app
+          P=$A/Info.plist
+          plutil -extract UILaunchScreen xml1 -o - "$P" >/dev/null || { echo "::error::UILaunchScreen missing"; exit 1; }
+          test -d $A/Frameworks/llama.framework || { echo "::error::llama.framework not embedded"; ls -la $A/Frameworks || true; exit 1; }
+          test -f $A/PrivacyInfo.xcprivacy || echo "::warning::PrivacyInfo missing"
+          lipo -info $A/SanadAI
+          zip -qry SanadAI.ipa Payload
+          ls -la SanadAI.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SanadAI-ipa
+          path: SanadAI.ipa
+      - name: Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="sanad3-build-${{ github.run_number }}"
+          BODY=$(printf 'IPA غير موقّع جاهز للتوقيع عبر ESign.\\n\\n- Commit: %s\\n- llama.cpp: %s\\n- البناء: %s' "${{ github.sha }}" "${{ env.LLAMA_TAG }}" "${{ github.run_number }}")
+          gh release create "$TAG" SanadAI.ipa --target "${{ github.sha }}" --title "سَنَد AI 3.0 — بناء ${{ github.run_number }}" --notes "$BODY"

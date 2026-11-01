@@ -1,0 +1,59 @@
+name: Compile Check
+on:
+  push:
+    branches: [main, sanad-3]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  LLAMA_TAG: b11960
+
+jobs:
+  compile:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select newest Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode*.app | grep -vi beta | sort -V | tail -1)
+          sudo xcode-select -s "$XC/Contents/Developer"
+          xcodebuild -version
+
+      - name: Cache llama.xcframework
+        uses: actions/cache@v4
+        with:
+          path: Frameworks/device
+          key: llama-xcframework-${{ env.LLAMA_TAG }}
+
+      - name: Fetch llama.cpp XCFramework
+        run: ./scripts/fetch-llama.sh
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Compile for device
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project SanadAI.xcodeproj -scheme SanadAI -configuration Debug \
+            -destination "generic/platform=iOS" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            2>&1 | tee build.log | grep -E "error:|warning: .*(unused|never used)|BUILD (SUCCEEDED|FAILED)" || true
+          if grep -q "BUILD FAILED" build.log; then
+            echo "--- first errors ---"
+            grep -E "error:" build.log | head -40
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compile-log
+          path: build.log

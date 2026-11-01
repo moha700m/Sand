@@ -1,0 +1,10 @@
+build/
+Frameworks/
+DerivedData/
+*.xcarchive
+*.ipa
+shots/
+test.log
+build.log
+.DS_Store
+SanadAI.xcodeproj/project.xcworkspace/xcuserdata/
