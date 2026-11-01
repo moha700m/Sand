@@ -27,6 +27,7 @@ struct ChatView: View {
     @State private var showPhotos = false
     @State private var photoItems: [PhotosPickerItem] = []
     @State private var showFiles = false
+    @State private var showSummary = false
 
     init(conversation: Conversation) {
         _vm = StateObject(wrappedValue: ChatViewModel(conversation: conversation, state: AppStateHolder.shared!))
@@ -183,6 +184,8 @@ struct ChatView: View {
                     .padding(.horizontal, 8).padding(.top, 8)
                 HStack(spacing: 10) {
                     Menu {
+                        Button { showSummary = true } label: { Label("الزبدة — لخّص محادثة واتساب", systemImage: "text.bubble") }
+                        Divider()
                         Button { showCamera = true } label: { Label("الكاميرا", systemImage: "camera") }
                         Button { showPhotos = true } label: { Label("الصور", systemImage: "photo.on.rectangle") }
                         Button { showFiles = true } label: { Label("ملف (PDF / نص / كود)", systemImage: "doc") }

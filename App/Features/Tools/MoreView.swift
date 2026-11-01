@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 enum MoreRoute: String, Hashable, CaseIterable {
     case settings, memory
     case knowledge, notes, workspace
-    case lens, tools, skills, saudi
+    case summary, lens, tools, skills, saudi
     case providers, mcp, server, arena
 }
 
@@ -32,6 +32,7 @@ struct MoreView: View {
                 }
 
                 Section("أدوات") {
+                    link(.summary, "text.bubble.fill", .teal, "الزبدة", "لخّص محادثة واتساب على جهازك")
                     link(.lens, "camera.viewfinder", .cyan, "العدسة", "اقرأ نصاً من صورة")
                     link(.tools, "hammer.fill", .indigo, "الأدوات", "\(state.userTools.all.count) أداة منشأة")
                     link(.skills, "books.vertical.fill", .teal, "المهارات", "\(state.skills.all.count) مهارة")
@@ -93,6 +94,7 @@ struct MoreView: View {
 
     @ViewBuilder func destination(_ route: MoreRoute) -> some View {
         switch route {
+        case .summary: ChatSummaryView()
         case .tools: ToolsView()
         case .skills: SkillsView()
         case .workspace: WorkspaceView()
