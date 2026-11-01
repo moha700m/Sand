@@ -1,22 +1,38 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Agent Builder: packages are portable, versioned, and runnable.
+/// Agents tab: pick an agent, give it a task, and forget about it.
+/// Runs live in `AgentRunner`, so leaving this tab does not stop them.
 struct AgentBuilderView: View {
     @EnvironmentObject var state: AppState
+    @EnvironmentObject var runner: AgentRunner
+
     @State private var editing: AgentPackage?
-    @State private var running: AgentPackage?
     @State private var importing = false
     @State private var exportURL: URL?
     @State private var error: String?
+    @State private var path = NavigationPath()
+
+    struct AgentRoute: Hashable { let id: String }
+    struct JobRoute: Hashable { let id: UUID }
+
+    var active: [AgentRunner.Job] { runner.activeJobs }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
+                if !active.isEmpty {
+                    Section("قيد التنفيذ الآن") {
+                        ForEach(active) { job in
+                            NavigationLink(value: JobRoute(id: job.id)) { AgentJobRow(job: job) }
+                        }
+                    }
+                }
+
                 Section {
                     VStack(alignment: .leading, spacing: 6) {
-                        Label("وكلاء بحزم قابلة للنقل", systemImage: "shippingbox.fill").font(.headline)
-                        Text("كل وكيل: تعليمات + أدوات + مهارات + حد خطوات + صلاحيات. صدّره كملف .sanadagent واستورده على جهاز آخر.")
+                        Label("مهمة واحدة، والباقي علينا", systemImage: "shippingbox.fill").font(.headline)
+                        Text("اختر وكيلاً واكتب المهمة. التشغيل يستمر في الخلفية حتى لو رجعت للرئيسية أو قفلت الشاشة، والنتيجة تُحفظ في المحادثات.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 4)
@@ -24,7 +40,30 @@ struct AgentBuilderView: View {
 
                 Section("الوكلاء (\(state.packages.count))") {
                     ForEach(state.packages) { pkg in
-                        row(pkg)
+                        NavigationLink(value: AgentRoute(id: pkg.id)) { agentRow(pkg) }
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) { state.deleteAgent(pkg.id) } label: {
+                                    Label("حذف", systemImage: "trash")
+                                }
+                                Button { editing = pkg } label: { Label("تعديل", systemImage: "pencil") }
+                                    .tint(.blue)
+                            }
+                            .contextMenu {
+                                Button { duplicate(pkg) } label: { Label("نسخة", systemImage: "plus.square.on.square") }
+                                Button { export(pkg) } label: { Label("تصدير حزمة", systemImage: "square.and.arrow.up") }
+                            }
+                    }
+                }
+
+                if !runner.finishedJobs.isEmpty {
+                    Section {
+                        ForEach(runner.finishedJobs.prefix(6)) { job in
+                            NavigationLink(value: JobRoute(id: job.id)) { AgentJobRow(job: job) }
+                        }
+                        Button("مسح السجل") { runner.clearFinished() }
+                            .font(.footnote)
+                    } header: {
+                        Text("آخر المهام")
                     }
                 }
 
@@ -39,19 +78,18 @@ struct AgentBuilderView: View {
                     Button { newAgent() } label: { Image(systemName: "plus") }
                 }
             }
-            .sheet(item: $editing) { pkg in
-                AgentEditor3(pkg: pkg)
-            }
-            .sheet(item: $running) { pkg in
-                NavigationStack {
+            .navigationDestination(for: AgentRoute.self) { route in
+                if let pkg = state.packages.first(where: { $0.id == route.id }) {
                     AgentRunView(agent: pkg.profile())
-                        .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button("إغلاق") { running = nil }
-                            }
-                        }
+                } else {
+                    ContentUnavailableView("الوكيل غير موجود", systemImage: "questionmark.folder",
+                                           description: Text("ربما حُذف. ارجع للقائمة."))
                 }
             }
+            .navigationDestination(for: JobRoute.self) { route in
+                AgentJobDetailView(jobID: route.id)
+            }
+            .sheet(item: $editing) { pkg in AgentEditor3(pkg: pkg) }
             .fileImporter(isPresented: $importing, allowedContentTypes: [.zip, .folder]) { result in
                 if case .success(let url) = result {
                     do {
@@ -61,53 +99,40 @@ struct AgentBuilderView: View {
                     } catch { self.error = error.localizedDescription }
                 }
             }
-            .sheet(item: Binding(get: { exportURL.map { ExportTarget(url: $0) } }, set: { if $0 == nil { exportURL = nil } })) { t in
-                ShareSheet(url: t.url).presentationDetents([.medium])
+            .sheet(item: Binding(get: { exportURL.map { ExportTarget(url: $0) } },
+                                 set: { if $0 == nil { exportURL = nil } })) { target in
+                ShareSheet(url: target.url).presentationDetents([.medium])
             }
+            .onAppear(perform: openPendingAgent)
+            .onChange(of: state.pendingAgentID) { _, _ in openPendingAgent() }
         }
     }
 
     struct ExportTarget: Identifiable { let id = UUID(); let url: URL }
 
-    func row(_ pkg: AgentPackage) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                Image(systemName: pkg.icon).font(.title3)
-                    .frame(width: 36, height: 36)
-                    .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(pkg.name).font(.headline)
-                    Text(pkg.summary.isEmpty ? "بدون وصف" : pkg.summary)
-                        .font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                }
-                Spacer()
+    func agentRow(_ pkg: AgentPackage) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: pkg.icon)
+                .font(.title3)
+                .frame(width: 38, height: 38)
+                .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(pkg.name).font(.headline)
+                Text(pkg.summary.isEmpty ? "بدون وصف" : pkg.summary)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Text(meta(pkg)).font(.caption2).foregroundStyle(.tertiary)
             }
-            HStack(spacing: 6) {
-                chip(pkg.tools.contains("*") ? "كل الأدوات" : "\(pkg.tools.count) أداة")
-                chip("\(pkg.maxSteps) خطوة")
-                if pkg.allowNetwork { chip("شبكة") } else { chip("بدون إنترنت") }
-                if !pkg.skillIDs.isEmpty { chip("\(pkg.skillIDs.count) مهارة") }
-            }
-            HStack {
-                Button("تشغيل") { running = pkg }.buttonStyle(.borderedProminent).controlSize(.small)
-                Button("تعديل") { editing = pkg }.buttonStyle(.bordered).controlSize(.small)
-                Menu {
-                    Button { duplicate(pkg) } label: { Label("نسخة", systemImage: "plus.square.on.square") }
-                    Button { export(pkg) } label: { Label("تصدير حزمة", systemImage: "square.and.arrow.up") }
-                    Divider()
-                    Button(role: .destructive) { state.deleteAgent(pkg.id) } label: { Label("حذف", systemImage: "trash") }
-                } label: { Image(systemName: "ellipsis") }
-                .controlSize(.small)
-                Spacer()
+            Spacer()
+            if runner.activeJob(for: pkg.id) != nil {
+                ProgressView().controlSize(.small)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
     }
 
-    func chip(_ t: String) -> some View {
-        Text(t).font(.caption2)
-            .padding(.horizontal, 6).padding(.vertical, 2)
-            .background(Color.primary.opacity(0.06), in: Capsule())
+    func meta(_ pkg: AgentPackage) -> String {
+        let tools = pkg.tools.contains("*") ? "كل الأدوات" : "\(pkg.tools.count) أداة"
+        return "\(tools) · حتى \(pkg.maxSteps) خطوة" + (pkg.allowNetwork ? " · شبكة" : "")
     }
 
     func newAgent() {
@@ -126,6 +151,38 @@ struct AgentBuilderView: View {
     func export(_ pkg: AgentPackage) {
         do { exportURL = try state.agentPackages.export(pkg.id) }
         catch { self.error = error.localizedDescription }
+    }
+
+    func openPendingAgent() {
+        guard let id = state.pendingAgentID else { return }
+        state.pendingAgentID = nil
+        guard state.packages.contains(where: { $0.id == id }) else { return }
+        path = NavigationPath()
+        path.append(AgentRoute(id: id))
+    }
+}
+
+struct AgentJobRow: View {
+    let job: AgentRunner.Job
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: job.agentIcon)
+                .foregroundStyle(.tint)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(job.goal).font(.subheadline).lineLimit(1)
+                Text("\(job.agentName) · \(job.state.title)").font(.caption2).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if job.state == .running {
+                ProgressView().controlSize(.small)
+            } else {
+                Image(systemName: job.state.icon)
+                    .font(.caption)
+                    .foregroundStyle(job.state == .done ? Color.green : Color.secondary)
+            }
+        }
     }
 }
 

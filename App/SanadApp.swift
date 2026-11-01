@@ -8,6 +8,7 @@ struct SanadApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(state)
+                .environmentObject(state.runner)
                 .environmentObject(state.settings)
                 .environmentObject(state.models)
                 .environment(\.layoutDirection, .rightToLeft)

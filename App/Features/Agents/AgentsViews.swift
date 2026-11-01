@@ -1,185 +1,276 @@
 import SwiftUI
 
-struct AgentsView: View {
-    @EnvironmentObject var state: AppState
-    @State private var editing: AgentProfile?
-    @State private var path = NavigationPath()
-
-    var body: some View {
-        NavigationStack(path: $path) {
-            List {
-                Section {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Label("وكلاء يفكرون وينفّذون", systemImage: "wand.and.stars").font(.headline)
-                        Text("الوكيل يقسّم مهمتك لخطوات، ويستخدم الأدوات (حاسبة، تقويم، مستنداتك، مواقيت الصلاة…) ويعرض لك كل خطوة. أي إجراء يغيّر شيئاً على جهازك يحتاج موافقتك.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 4)
-                }
-                Section("الوكلاء") {
-                    ForEach(state.agents) { a in
-                        NavigationLink(value: a) {
-                            HStack(spacing: 12) {
-                                Image(systemName: a.icon).font(.title3).frame(width: 36, height: 36)
-                                    .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(a.name).font(.headline)
-                                    Text(a.summary).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                                    Text("\(a.toolNames.contains("*") ? "كل الأدوات" : "\(a.toolNames.count) أداة") · حتى \(a.maxSteps) خطوات").font(.caption2).foregroundStyle(.tertiary)
-                                }
-                            }
-                        }
-                        .swipeActions {
-                            if !a.builtIn {
-                                Button(role: .destructive) { state.deleteAgent(a.id) } label: { Label("حذف", systemImage: "trash") }
-                            }
-                            Button { editing = a } label: { Label("تعديل", systemImage: "pencil") }.tint(.blue)
-                        }
-                    }
-                }
-                Section("الأدوات المتاحة") {
-                    ForEach(state.registry.specs) { t in
-                        HStack {
-                            Image(systemName: t.icon).frame(width: 24).foregroundStyle(.tint)
-                            Text(t.title)
-                            Spacer()
-                            if t.requiresConfirmation { Image(systemName: "hand.raised").font(.caption).foregroundStyle(.orange) }
-                            if t.usesNetwork {
-                                Image(systemName: "globe").font(.caption).foregroundStyle(state.settings.webAccess ? .blue : .gray)
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("الوكلاء")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        editing = AgentProfile(name: "وكيل جديد", icon: "person.crop.circle.badge.questionmark", summary: "",
-                                               instructions: "أنت وكيل مساعد. استخدم الأدوات عند الحاجة.", toolNames: ["calculator", "current_datetime"])
-                    } label: { Image(systemName: "plus") }
-                }
-            }
-            .navigationDestination(for: AgentProfile.self) { a in AgentRunView(agent: a) }
-            .sheet(item: $editing) { a in AgentEditor(agent: a) }
-            .onAppear {
-                if state.deepLinkScreen == "agentRun", let a = state.agents.first(where: { $0.id == "finance" }) {
-                    state.deepLinkScreen = nil
-                    path.append(a)
-                }
-            }
-        }
-    }
-}
-
-/// Dedicated task runner showing the live plan → tool → result trace.
+/// Task runner for one agent. The run itself lives in `AgentRunner`, so leaving
+/// this screen — or the whole app — does not stop it.
 struct AgentRunView: View {
     @EnvironmentObject var state: AppState
+    @EnvironmentObject var runner: AgentRunner
     let agent: AgentProfile
+
     @State private var goal = ""
-    @State private var steps: [AgentStep] = []
-    @State private var partial = ""
-    @State private var answer = ""
-    @State private var running = false
-    @State private var error: String?
-    @State private var task: Task<Void, Never>?
+    @State private var jobID: UUID?
+    @State private var message: String?
+    @FocusState private var editingGoal: Bool
+
+    var job: AgentRunner.Job? { jobID.flatMap { runner.job($0) } }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 ModelStatusBanner()
-                Card {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label(agent.name, systemImage: agent.icon).font(.headline)
-                        Text(agent.summary).font(.footnote).foregroundStyle(.secondary)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack {
-                                ForEach(state.registry.specs(for: agent.toolNames, allowNetwork: true).map(\.name), id: \.self) { n in
-                                    if let t = state.registry.tool(named: n)?.spec {
-                                        Label(t.title, systemImage: t.icon).font(.caption2)
-                                            .padding(.horizontal, 8).padding(.vertical, 4)
-                                            .background(Color.accentColor.opacity(0.1), in: Capsule())
-                                    }
-                                }
-                            }
-                        }
-                    }
+                if let job {
+                    live(job)
+                } else {
+                    compose
                 }
-                TextField("وش المهمة؟", text: $goal, axis: .vertical)
-                    .lineLimit(2...6)
-                    .padding(12)
-                    .background(Color("CardBackground"), in: RoundedRectangle(cornerRadius: 14))
-                HStack {
-                    if running {
-                        Button(role: .destructive) { task?.cancel() } label: { Label("إيقاف", systemImage: "stop.fill").frame(maxWidth: .infinity) }
-                            .buttonStyle(.bordered)
-                    } else {
-                        Button(action: run) { Label("نفّذ المهمة", systemImage: "play.fill").frame(maxWidth: .infinity) }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(goal.trimmingCharacters(in: .whitespaces).isEmpty)
-                    }
-                }
-                .controlSize(.large)
-
-                if !steps.isEmpty { AgentTraceView(steps: steps.filter { $0.kind != .final }, live: running) }
-                if running && !partial.isEmpty {
-                    Text(partial).font(.callout).foregroundStyle(.secondary)
-                }
-                if !answer.isEmpty {
-                    Card {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Label("النتيجة", systemImage: "checkmark.seal.fill").font(.headline).foregroundStyle(.green)
-                            MarkdownText(text: answer)
-                            HStack {
-                                ShareLink(item: answer) { Label("مشاركة", systemImage: "square.and.arrow.up") }
-                                Spacer()
-                                Button { SpeechService.shared.speak(answer) } label: { Label("استمع", systemImage: "speaker.wave.2") }
-                            }
-                            .font(.footnote)
-                        }
-                    }
-                }
-                if let error { Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red).font(.footnote) }
             }
             .padding()
+            .padding(.bottom, 24)
         }
         .navigationTitle(agent.name)
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            if UserDefaults.standard.bool(forKey: "demo"), steps.isEmpty { DemoContent.fillAgentRun(goal: &goal, steps: &steps, answer: &answer) }
+        .onAppear(perform: attachRunningJob)
+    }
+
+    // MARK: Compose
+
+    var compose: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Card {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label(agent.name, systemImage: agent.icon).font(.headline)
+                    if !agent.summary.isEmpty {
+                        Text(agent.summary).font(.footnote).foregroundStyle(.secondary)
+                    }
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            chip("\(agent.toolNames.contains("*") ? "كل الأدوات" : "\(agent.toolNames.count) أداة")")
+                            chip("حتى \(agent.maxSteps) خطوة")
+                        }
+                    }
+                }
+            }
+
+            TextField("اكتب المهمة… مثال: احسب زكاتي واحفظ النتيجة في مساحة العمل", text: $goal, axis: .vertical)
+                .lineLimit(3...8)
+                .focused($editingGoal)
+                .padding(12)
+                .background(Color("CardBackground"), in: RoundedRectangle(cornerRadius: 14))
+
+            Button(action: run) {
+                Label("نفّذ المهمة", systemImage: "play.fill").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(goal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+            Label("بعد التشغيل تكمل المهمة في الخلفية حتى لو رجعت للرئيسية أو قفلت الشاشة.",
+                  systemImage: "moon.zzz.fill")
+                .font(.caption).foregroundStyle(.secondary)
+
+            if let message {
+                Label(message, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote).foregroundStyle(.red)
+            }
+        }
+    }
+
+    // MARK: Live job
+
+    func live(_ job: AgentRunner.Job) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            AgentJobStatusCard(job: job)
+
+            if !job.steps.isEmpty {
+                AgentTraceView(steps: job.steps.filter { $0.kind != .final }, live: job.isActive)
+            }
+
+            if job.isActive && !job.partial.isEmpty {
+                Text(job.partial).font(.callout).foregroundStyle(.secondary)
+            }
+
+            if !job.answer.isEmpty {
+                AgentAnswerCard(text: job.answer)
+            }
+
+            if let error = job.error {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote).foregroundStyle(.red)
+            }
+
+            HStack(spacing: 10) {
+                if job.isActive {
+                    Button(role: .destructive) { runner.cancel(job.id) } label: {
+                        Label("إيقاف", systemImage: "stop.fill").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                } else {
+                    Button {
+                        if let newID = runner.retry(job.id) { jobID = newID }
+                    } label: {
+                        Label("إعادة", systemImage: "arrow.clockwise").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button {
+                        jobID = nil
+                        goal = ""
+                        message = nil
+                    } label: {
+                        Label("مهمة جديدة", systemImage: "plus").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+            .controlSize(.large)
+        }
+    }
+
+    // MARK: Actions
+
+    func attachRunningJob() {
+        guard jobID == nil else { return }
+        if let running = runner.activeJob(for: agent.id) ?? runner.lastJob(for: agent.id), running.isActive {
+            jobID = running.id
         }
     }
 
     func run() {
-        guard state.engineReady else { error = LLMError.noModelLoaded.localizedDescription; return }
-        error = nil; steps = []; answer = ""; partial = ""; running = true
-        let loop = state.makeAgentLoop(agentID: agent.id)
-        if agent.id == "deep_research" { loop.allowNetwork = true }
-        var profile = agent
-        profile.maxSteps = max(agent.maxSteps, state.settings.agentMaxSteps)
-        let g = goal
-        task = Task {
-            do {
-                let result = try await loop.run(goal: g, profile: profile) { ev in
-                    Task { @MainActor in
-                        switch ev {
-                        case .step(let s): steps.append(s); partial = ""
-                        case .partial(let p): partial = p
-                        case .finished(let a): answer = a
+        let text = goal.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        let ref = state.package(for: agent.id)?.modelRef
+        guard state.isReady(ref) else {
+            message = state.isCloud(ref)
+                ? "مفتاح المزود السحابي غير مضبوط. افتح «مزودو السحابة» وأضف المفتاح."
+                : "حمّل نموذجاً محلياً أولاً من تبويب النماذج."
+            return
+        }
+        message = nil
+        editingGoal = false
+        jobID = runner.start(goal: text, agent: agent)
+    }
+
+    func chip(_ text: String) -> some View {
+        Text(text).font(.caption2)
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(Color.accentColor.opacity(0.1), in: Capsule())
+    }
+}
+
+/// Read-only live view of any job, opened from the run list.
+struct AgentJobDetailView: View {
+    @EnvironmentObject var runner: AgentRunner
+    let jobID: UUID
+
+    var body: some View {
+        ScrollView {
+            if let job = runner.job(jobID) {
+                VStack(alignment: .leading, spacing: 14) {
+                    AgentJobStatusCard(job: job)
+                    if !job.steps.isEmpty {
+                        AgentTraceView(steps: job.steps.filter { $0.kind != .final }, live: job.isActive)
+                    }
+                    if job.isActive && !job.partial.isEmpty {
+                        Text(job.partial).font(.callout).foregroundStyle(.secondary)
+                    }
+                    if !job.answer.isEmpty { AgentAnswerCard(text: job.answer) }
+                    if let error = job.error {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote).foregroundStyle(.red)
+                    }
+                    HStack(spacing: 10) {
+                        if job.isActive {
+                            Button(role: .destructive) { runner.cancel(job.id) } label: {
+                                Label("إيقاف", systemImage: "stop.fill").frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                        } else {
+                            Button { runner.retry(job.id) } label: {
+                                Label("إعادة التشغيل", systemImage: "arrow.clockwise").frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
                         }
                     }
+                    .controlSize(.large)
                 }
-                answer = result.answer
-                var c = Conversation(title: String(g.prefix(40)), agentID: agent.id)
-                c.messages = [ChatMessage(role: .user, content: g),
-                              ChatMessage(role: .assistant, content: result.answer, agentSteps: result.steps)]
-                state.upsert(c)
-            } catch is CancellationError {
-                error = "تم الإيقاف."
-            } catch {
-                self.error = error.localizedDescription
+                .padding()
+            } else {
+                ContentUnavailableView("المهمة غير موجودة", systemImage: "tray",
+                                       description: Text("ربما حُذفت من السجل."))
             }
-            running = false
+        }
+        .navigationTitle(runner.job(jobID)?.agentName ?? "مهمة")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct AgentJobStatusCard: View {
+    let job: AgentRunner.Job
+
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    Image(systemName: job.agentIcon)
+                        .font(.title3)
+                        .frame(width: 36, height: 36)
+                        .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(job.agentName).font(.headline)
+                        Text(job.goal).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                    }
+                    Spacer()
+                }
+
+                HStack(spacing: 12) {
+                    Label(job.state.title, systemImage: job.state.icon)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(color)
+                    if job.state == .running {
+                        ProgressView().controlSize(.small)
+                    }
+                    Spacer()
+                    Text("\(job.steps.count) خطوة · \(job.toolCallCount) أداة")
+                        .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                }
+
+                if job.isActive {
+                    Label("تعمل في الخلفية — يمكنك الخروج من الشاشة", systemImage: "arrow.down.right.and.arrow.up.left")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    var color: Color {
+        switch job.state {
+        case .done: return .green
+        case .failed: return .red
+        case .cancelled, .interrupted: return .orange
+        case .queued: return .secondary
+        case .running: return .accentColor
+        }
+    }
+}
+
+struct AgentAnswerCard: View {
+    let text: String
+
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("النتيجة", systemImage: "checkmark.seal.fill")
+                    .font(.headline).foregroundStyle(.green)
+                MarkdownText(text: text)
+                HStack {
+                    ShareLink(item: text) { Label("مشاركة", systemImage: "square.and.arrow.up") }
+                    Spacer()
+                    Button { SpeechService.shared.speak(text) } label: {
+                        Label("استمع", systemImage: "speaker.wave.2")
+                    }
+                }
+                .font(.footnote)
+            }
         }
     }
 }
@@ -194,8 +285,11 @@ struct AgentTraceView: View {
                 StepRow(step: s, isLast: i == steps.count - 1 && !live)
             }
             if live {
-                HStack(spacing: 8) { ProgressView().controlSize(.small); Text("يعمل…").font(.caption).foregroundStyle(.secondary) }
-                    .padding(.leading, 4).padding(.top, 6)
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("يعمل…").font(.caption).foregroundStyle(.secondary)
+                }
+                .padding(.leading, 4).padding(.top, 6)
             }
         }
     }
@@ -205,98 +299,55 @@ struct AgentTraceView: View {
         let isLast: Bool
         @State private var expanded = false
 
-        var color: Color {
-            switch step.kind {
-            case .thought: return .gray
-            case .toolCall: return .indigo
-            case .toolResult: return .green
-            case .denied: return .orange
-            case .error: return .red
-            case .final: return .accentColor
+        var body: some View {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(spacing: 0) {
+                    Image(systemName: icon)
+                        .font(.caption)
+                        .foregroundStyle(color)
+                        .frame(width: 24, height: 24)
+                        .background(color.opacity(0.12), in: Circle())
+                    if !isLast {
+                        Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1.5)
+                            .frame(maxHeight: .infinity)
+                    }
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(step.title).font(.subheadline.weight(.medium))
+                    if !step.detail.isEmpty {
+                        Text(step.detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(expanded ? nil : 3)
+                            .textSelection(.enabled)
+                    }
+                }
+                .padding(.bottom, 10)
+                Spacer(minLength: 0)
             }
+            .contentShape(Rectangle())
+            .onTapGesture { withAnimation(.snappy) { expanded.toggle() } }
         }
 
         var icon: String {
             switch step.kind {
             case .thought: return "brain"
-            case .toolCall: return "wrench.and.screwdriver.fill"
-            case .toolResult: return "checkmark.circle.fill"
+            case .toolCall: return "hammer.fill"
+            case .toolResult: return "checkmark"
             case .denied: return "hand.raised.fill"
-            case .error: return "xmark.octagon.fill"
+            case .error: return "exclamationmark.triangle.fill"
             case .final: return "flag.checkered"
             }
         }
 
-        var body: some View {
-            HStack(alignment: .top, spacing: 10) {
-                VStack(spacing: 0) {
-                    Image(systemName: icon).font(.caption).foregroundStyle(.white)
-                        .frame(width: 24, height: 24).background(color, in: Circle())
-                    if !isLast { Rectangle().fill(color.opacity(0.3)).frame(width: 2).frame(maxHeight: .infinity) }
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(step.title).font(.subheadline.weight(.semibold))
-                    Text(step.detail)
-                        .font(step.kind == .toolCall ? .caption.monospaced() : .caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(expanded ? nil : 3)
-                        .onTapGesture { withAnimation { expanded.toggle() } }
-                }
-                .padding(.bottom, 12)
-                Spacer(minLength: 0)
-            }
-        }
-    }
-}
-
-struct AgentEditor: View {
-    @EnvironmentObject var state: AppState
-    @Environment(\.dismiss) var dismiss
-    @State var agent: AgentProfile
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("الأساسيات") {
-                    TextField("الاسم", text: $agent.name)
-                    TextField("وصف مختصر", text: $agent.summary)
-                    Picker("الأيقونة", selection: $agent.icon) {
-                        ForEach(["wand.and.stars", "brain.head.profile", "briefcase", "book", "cart", "car", "stethoscope",
-                                 "building.2", "graduationcap", "person.crop.circle.badge.questionmark", "leaf", "airplane"], id: \.self) {
-                            Image(systemName: $0).tag($0)
-                        }
-                    }
-                    Stepper("أقصى عدد خطوات: \(agent.maxSteps)", value: $agent.maxSteps, in: 1...12)
-                }
-                Section("التعليمات") {
-                    TextEditor(text: $agent.instructions).frame(minHeight: 120)
-                }
-                Section("الأدوات") {
-                    ForEach(state.registry.specs) { t in
-                        Toggle(isOn: Binding(
-                            get: { agent.toolNames.contains(t.name) },
-                            set: { on in
-                                if on { agent.toolNames.append(t.name) } else { agent.toolNames.removeAll { $0 == t.name } }
-                            })) {
-                            Label(t.title, systemImage: t.icon)
-                        }
-                    }
-                }
-                if agent.builtIn {
-                    Section { Text("التعديل على وكيل جاهز يُحفظ كنسخة خاصة بك.").font(.footnote).foregroundStyle(.secondary) }
-                }
-            }
-            .navigationTitle(agent.name)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("حفظ") {
-                        var a = agent
-                        if a.builtIn { a.id = UUID().uuidString; a.builtIn = false; a.name += " (نسختي)" }
-                        state.saveAgent(a)
-                        dismiss()
-                    }
-                }
+        var color: Color {
+            switch step.kind {
+            case .thought: return .purple
+            case .toolCall: return .blue
+            case .toolResult: return .green
+            case .denied: return .orange
+            case .error: return .red
+            case .final: return .accentColor
             }
         }
     }

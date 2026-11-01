@@ -26,110 +26,108 @@ struct WorkspaceView: View {
     var agentID: String { state.workspaceContext.agentID }
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    HStack {
-                        Image(systemName: "folder.fill").foregroundStyle(.orange)
-                        Text(path.isEmpty ? "الجذر" : path).font(.footnote.monospaced()).lineLimit(1)
-                        Spacer()
-                        Text(ByteCountFormatter.string(fromByteCount: state.workspace.totalBytes(agentID), countStyle: .file))
-                            .font(.caption2).foregroundStyle(.secondary)
-                    }
-                    if !search.isEmpty {
-                        ForEach(searchResults) { hit in
-                            Button {
-                                open(hit.path)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(hit.path).font(.footnote)
-                                    Text(hit.snippet).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                                }
+        List {
+            Section {
+                HStack {
+                    Image(systemName: "folder.fill").foregroundStyle(.orange)
+                    Text(path.isEmpty ? "الجذر" : path).font(.footnote.monospaced()).lineLimit(1)
+                    Spacer()
+                    Text(ByteCountFormatter.string(fromByteCount: state.workspace.totalBytes(agentID), countStyle: .file))
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+                if !search.isEmpty {
+                    ForEach(searchResults) { hit in
+                        Button {
+                            open(hit.path)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(hit.path).font(.footnote)
+                                Text(hit.snippet).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                             }
-                            .buttonStyle(.plain)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            if !path.isEmpty {
+                Button {
+                    path = parent(path)
+                } label: { Label("أعلى مستوى", systemImage: "arrow.up.left") }
+            }
+
+            Section("الملفات") {
+                if nodes.isEmpty && error == nil {
+                    Text("لا ملفات بعد. أنشئ ملفاً أو اطلب من وكيل الكتابة إنشاء مشروع.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                ForEach(nodes) { node in
+                    if node.isDirectory {
+                        Button { path = node.path } label: {
+                            HStack {
+                                Label(node.name, systemImage: "folder")
+                                Spacer()
+                                Text("\(node.childCount)").font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Button { open(node.path) } label: {
+                            HStack {
+                                Label(node.name, systemImage: icon(for: node.name))
+                                Spacer()
+                                Text(ByteCountFormatter.string(fromByteCount: node.size, countStyle: .file))
+                                    .font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .swipeActions {
+                            Button(role: .destructive) { pendingDelete = node } label: { Label("حذف", systemImage: "trash") }
                         }
                     }
                 }
+            }
 
-                if !path.isEmpty {
-                    Button {
-                        path = parent(path)
-                    } label: { Label("أعلى مستوى", systemImage: "arrow.up.left") }
-                }
-
-                Section("الملفات") {
-                    if nodes.isEmpty && error == nil {
-                        Text("لا ملفات بعد. أنشئ ملفاً أو اطلب من وكيل الكتابة إنشاء مشروع.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    }
-                    ForEach(nodes) { node in
-                        if node.isDirectory {
-                            Button { path = node.path } label: {
-                                HStack {
-                                    Label(node.name, systemImage: "folder")
-                                    Spacer()
-                                    Text("\(node.childCount)").font(.caption2).foregroundStyle(.secondary)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        } else {
-                            Button { open(node.path) } label: {
-                                HStack {
-                                    Label(node.name, systemImage: icon(for: node.name))
-                                    Spacer()
-                                    Text(ByteCountFormatter.string(fromByteCount: node.size, countStyle: .file))
-                                        .font(.caption2).foregroundStyle(.secondary)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .swipeActions {
-                                Button(role: .destructive) { pendingDelete = node } label: { Label("حذف", systemImage: "trash") }
-                            }
-                        }
-                    }
-                }
-
-                if let error {
-                    Section { Text(error).font(.footnote).foregroundStyle(.red) }
-                }
+            if let error {
+                Section { Text(error).font(.footnote).foregroundStyle(.red) }
             }
-            .searchable(text: $search, prompt: "ابحث في ملفات مساحة العمل")
-            .navigationTitle("مساحة العمل")
-            .toolbar {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Menu {
-                        Button { newName = ""; showNewFile = true } label: { Label("ملف جديد", systemImage: "doc.badge.plus") }
-                        Button { newName = ""; showNewFolder = true } label: { Label("مجلد جديد", systemImage: "folder.badge.plus") }
-                        Divider()
-                        Button { exportWorkspace() } label: { Label("تصدير ZIP", systemImage: "archivebox") }
-                    } label: { Image(systemName: "plus") }
-                }
+        }
+        .searchable(text: $search, prompt: "ابحث في ملفات مساحة العمل")
+        .navigationTitle("مساحة العمل")
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Menu {
+                    Button { newName = ""; showNewFile = true } label: { Label("ملف جديد", systemImage: "doc.badge.plus") }
+                    Button { newName = ""; showNewFolder = true } label: { Label("مجلد جديد", systemImage: "folder.badge.plus") }
+                    Divider()
+                    Button { exportWorkspace() } label: { Label("تصدير ZIP", systemImage: "archivebox") }
+                } label: { Image(systemName: "plus") }
             }
-            .refreshable { reload() }
-            .onAppear(perform: reload)
-            .onChange(of: path) { _, _ in reload() }
-            .alert("ملف جديد", isPresented: $showNewFile) {
-                TextField("main.swift", text: $newName)
-                Button("إنشاء") { createFile() }
-                Button("إلغاء", role: .cancel) {}
-            }
-            .alert("مجلد جديد", isPresented: $showNewFolder) {
-                TextField("src", text: $newName)
-                Button("إنشاء") { createFolder() }
-                Button("إلغاء", role: .cancel) {}
-            }
-            .confirmationDialog("حذف \(pendingDelete?.name ?? "")؟", isPresented: Binding(
-                get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })) {
-                Button("حذف نهائي", role: .destructive) { deletePending() }
-                Button("إلغاء", role: .cancel) { pendingDelete = nil }
-            }
-            .sheet(item: $editor) { target in
-                EditorSheet(target: target) { text in save(target, text) }
-            }
-            .sheet(item: Binding(get: { exportURL.map { ExportItem(url: $0) } }, set: { if $0 == nil { exportURL = nil } })) { item in
-                ShareSheet(url: item.url)
-                    .presentationDetents([.medium])
-            }
+        }
+        .refreshable { reload() }
+        .onAppear(perform: reload)
+        .onChange(of: path) { _, _ in reload() }
+        .alert("ملف جديد", isPresented: $showNewFile) {
+            TextField("main.swift", text: $newName)
+            Button("إنشاء") { createFile() }
+            Button("إلغاء", role: .cancel) {}
+        }
+        .alert("مجلد جديد", isPresented: $showNewFolder) {
+            TextField("src", text: $newName)
+            Button("إنشاء") { createFolder() }
+            Button("إلغاء", role: .cancel) {}
+        }
+        .confirmationDialog("حذف \(pendingDelete?.name ?? "")؟", isPresented: Binding(
+            get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })) {
+            Button("حذف نهائي", role: .destructive) { deletePending() }
+            Button("إلغاء", role: .cancel) { pendingDelete = nil }
+        }
+        .sheet(item: $editor) { target in
+            EditorSheet(target: target) { text in save(target, text) }
+        }
+        .sheet(item: Binding(get: { exportURL.map { ExportItem(url: $0) } }, set: { if $0 == nil { exportURL = nil } })) { item in
+            ShareSheet(url: item.url)
+                .presentationDetents([.medium])
         }
     }
 

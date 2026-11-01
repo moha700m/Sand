@@ -1,83 +1,29 @@
 import SwiftUI
 
-/// Browse the whole Hugging Face GGUF catalog, pick a quantization, download it.
-struct ModelHubView: View {
-    @EnvironmentObject var state: AppState
-    @EnvironmentObject var models: ModelManager
-    @Environment(\.dismiss) private var dismiss
-
-    @State private var query = ""
-    @State private var repos: [HFRepo] = []
-    @State private var loading = false
-    @State private var error: String?
-    @State private var hasSearched = false
+/// Compact row used by the merged model search / discovery sections.
+struct HFRepoRow: View {
+    let repo: HFRepo
 
     var body: some View {
-        NavigationStack {
-            List {
-                if let error {
-                    Section { Text(error).font(.footnote).foregroundStyle(.red) }
-                }
-                if loading && repos.isEmpty {
-                    Section { HStack { ProgressView(); Text("أبحث في Hugging Face…").font(.footnote) } }
-                }
-                Section {
-                    ForEach(repos) { repo in
-                        NavigationLink {
-                            HFRepoView(repo: repo)
-                        } label: { row(repo) }
-                    }
-                } header: {
-                    Text(hasSearched ? "النتائج (\(repos.count))" : "الأكثر تنزيلاً")
-                } footer: {
-                    Text("البحث يغطي مستودعات GGUF فقط. اختر المستودع ثم ملف القياس المناسب لجهازك.")
-                        .font(.caption2)
-                }
-            }
-            .searchable(text: $query, prompt: "qwen3 · gemma · llama · arabic")
-            .onSubmit(of: .search) { Task { await search() } }
-            .navigationTitle("مكتبة النماذج")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("إغلاق") { dismiss() } }
-                ToolbarItem(placement: .primaryAction) {
-                    Button { Task { await search() } } label: { Image(systemName: "arrow.clockwise") }
-                        .disabled(loading)
-                }
-            }
-            .task { if !hasSearched { await search() } }
-        }
-    }
-
-    func row(_ repo: HFRepo) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(repo.id).font(.footnote.weight(.semibold)).lineLimit(1)
             HStack(spacing: 10) {
-                Label("\(repo.downloads)", systemImage: "arrow.down.circle").font(.caption2)
-                Label("\(repo.likes)", systemImage: "heart").font(.caption2)
-                if let u = repo.updated { Text(String(u.prefix(10))).font(.caption2) }
+                Label("\(repo.downloads)", systemImage: "arrow.down.circle")
+                Label("\(repo.likes)", systemImage: "heart")
+                if let u = repo.updated { Text(String(u.prefix(10))) }
+                Spacer()
             }
-            .foregroundStyle(.secondary)
+            .font(.caption2).foregroundStyle(.secondary)
         }
-    }
-
-    func search() async {
-        loading = true
-        error = nil
-        defer { loading = false; hasSearched = true }
-        do {
-            repos = try await HuggingFaceHub.search(query)
-            if repos.isEmpty { error = "لا نتائج لهذا البحث." }
-        } catch {
-            self.error = error.localizedDescription
-        }
+        .padding(.vertical, 2)
     }
 }
 
+/// Files inside one Hugging Face repo, with a real fit verdict per file.
 struct HFRepoView: View {
-    @EnvironmentObject var state: AppState
     @EnvironmentObject var models: ModelManager
     let repo: HFRepo
+    var onDownload: (() -> Void)? = nil
 
     @State private var files: [HFFile] = []
     @State private var loading = false
@@ -105,7 +51,8 @@ struct HFRepoView: View {
 
             Section("ملفات GGUF (\(downloadable.count))") {
                 if !loading && downloadable.isEmpty {
-                    Text("لا ملفات GGUF قابلة للتحميل في هذا المستودع.").font(.footnote).foregroundStyle(.secondary)
+                    Text("لا ملفات GGUF قابلة للتحميل في هذا المستودع.")
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
                 ForEach(downloadable) { file in
                     fileRow(file)
@@ -117,7 +64,8 @@ struct HFRepoView: View {
                     ForEach(skipped) { f in
                         VStack(alignment: .leading, spacing: 2) {
                             Text(f.fileName).font(.caption).lineLimit(1)
-                            Text(f.isProjector ? "مُسقط رؤية (mmproj) — يحتاج محرك رؤية غير مضمّن." : "ملف مجزّأ — التحميل لا يجمع الأجزاء بعد.")
+                            Text(f.isProjector ? "مُسقط رؤية (mmproj) — يحتاج محرك رؤية غير مضمّن."
+                                               : "ملف مجزّأ — التحميل لا يجمع الأجزاء بعد.")
                                 .font(.caption2).foregroundStyle(.secondary)
                         }
                     }
@@ -126,7 +74,8 @@ struct HFRepoView: View {
 
             if let queued {
                 Section {
-                    Label("بدأ تحميل \(queued) — تابع التقدم من تبويب النماذج.", systemImage: "arrow.down.circle.fill")
+                    Label("بدأ تحميل \(queued) — تابع التقدم من تبويب النماذج.",
+                          systemImage: "arrow.down.circle.fill")
                         .font(.footnote).foregroundStyle(.green)
                 }
             }
@@ -152,9 +101,7 @@ struct HFRepoView: View {
             }
             .font(.caption2).foregroundStyle(.secondary)
 
-            Button {
-                download(file)
-            } label: {
+            Button { download(file) } label: {
                 Label("تحميل", systemImage: "arrow.down.circle")
             }
             .buttonStyle(.bordered).controlSize(.small)
@@ -197,5 +144,6 @@ struct HFRepoView: View {
         models.register(info)
         models.download(info)
         queued = file.fileName
+        onDownload?()
     }
 }

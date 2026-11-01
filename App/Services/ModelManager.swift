@@ -82,6 +82,27 @@ final class ModelManager: NSObject, ObservableObject {
 
     func isInstalled(_ m: ModelInfo) -> Bool { installed.contains { $0.fileName == m.fileName } }
 
+    /// Any model we know about: ad-hoc downloads, catalog entries, or installed files.
+    func knownModel(_ id: String) -> ModelInfo? {
+        registered[id] ?? ModelCatalog.model(id: id) ?? installed.first { $0.id == id }
+    }
+
+    struct InFlight: Identifiable {
+        var model: ModelInfo
+        var state: DownloadState
+        var id: String { model.id }
+    }
+
+    /// Every download in progress or failed — including models added from a URL
+    /// that exist nowhere in the catalog.
+    var inFlight: [InFlight] {
+        downloads.compactMap { id, st in
+            guard let m = knownModel(id) else { return nil }
+            return InFlight(model: m, state: st)
+        }
+        .sorted { $0.model.name < $1.model.name }
+    }
+
     // MARK: Download
 
     func register(_ m: ModelInfo) { registered[m.id] = m }

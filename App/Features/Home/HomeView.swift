@@ -5,12 +5,14 @@ struct HomeView: View {
     @EnvironmentObject var state: AppState
     @EnvironmentObject var models: ModelManager
     @EnvironmentObject var settings: AppSettings
+    @EnvironmentObject var runner: AgentRunner
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
                     runtimeCard
+                    runningCard
                     quickActions
                     agentsSection
                     recentSection
@@ -79,11 +81,35 @@ struct HomeView: View {
         .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
     }
 
+    // MARK: Running jobs
+
+    @ViewBuilder var runningCard: some View {
+        let jobs = runner.activeJobs
+        if let first = jobs.first {
+            Button { state.tab = .agents } label: {
+                HStack(spacing: 12) {
+                    ProgressView().controlSize(.small)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(jobs.count == 1 ? "مهمة تعمل الآن" : "\(jobs.count) مهام تعمل الآن")
+                            .font(.footnote.weight(.semibold))
+                        Text(first.goal).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.left").font(.caption2).foregroundStyle(.tertiary)
+                }
+                .padding(12)
+                .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     // MARK: Actions
 
     var quickActions: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
             action("محادثة جديدة", "bubble.left.and.bubble.right.fill", .teal) {
+                state.deepLinkScreen = "newChat"
                 state.tab = .chat
             }
             action("النماذج", "cpu.fill", .indigo) { state.tab = .models }
@@ -120,14 +146,17 @@ struct HomeView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(state.packages.prefix(6)) { p in
-                        VStack(alignment: .leading, spacing: 6) {
-                            Image(systemName: p.icon).foregroundStyle(.tint)
-                            Text(p.name).font(.footnote.weight(.semibold)).lineLimit(1)
-                            Text("\(p.maxSteps) خطوة").font(.caption2).foregroundStyle(.secondary)
+                        Button { state.openAgent(p.id) } label: {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Image(systemName: p.icon).foregroundStyle(.tint)
+                                Text(p.name).font(.footnote.weight(.semibold)).lineLimit(1)
+                                Text("\(p.maxSteps) خطوة").font(.caption2).foregroundStyle(.secondary)
+                            }
+                            .padding(10)
+                            .frame(width: 120, alignment: .leading)
+                            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
                         }
-                        .padding(10)
-                        .frame(width: 120, alignment: .leading)
-                        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -149,16 +178,20 @@ struct HomeView: View {
                     .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
             } else {
                 ForEach(state.conversations.prefix(4)) { c in
-                    HStack(spacing: 10) {
-                        Image(systemName: "bubble.left").foregroundStyle(.secondary)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(c.title).font(.footnote.weight(.medium)).lineLimit(1)
-                            Text(String(c.messages.last?.content.prefix(70) ?? "")).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    Button { state.openConversation(c.id) } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "bubble.left").foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(c.title).font(.footnote.weight(.medium)).lineLimit(1)
+                                Text(String(c.messages.last?.content.prefix(70) ?? "")).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.left").font(.caption2).foregroundStyle(.tertiary)
                         }
-                        Spacer()
+                        .padding(10)
+                        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
                     }
-                    .padding(10)
-                    .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+                    .buttonStyle(.plain)
                 }
             }
         }

@@ -70,7 +70,15 @@ struct ConversationsView: View {
                 ChatView(conversation: state.conversations.first { $0.id == id } ?? Conversation(id: id))
             }
             .onChange(of: state.pendingQuery) { _, _ in openPendingQuery() }
+            .onChange(of: state.pendingConversationID) { _, _ in openPendingConversation() }
+            .onChange(of: state.deepLinkScreen) { _, new in
+                if new == "newChat" {
+                    state.deepLinkScreen = nil
+                    newChat()
+                }
+            }
             .onAppear {
+                openPendingConversation()
                 if state.pendingQuery != nil {
                     openPendingQuery()
                 } else if state.deepLinkScreen == "newChat" {
@@ -82,6 +90,13 @@ struct ConversationsView: View {
                 }
             }
         }
+    }
+
+    func openPendingConversation() {
+        guard let id = state.pendingConversationID else { return }
+        state.pendingConversationID = nil
+        guard state.conversations.contains(where: { $0.id == id }) else { return }
+        path = [id]
     }
 
     func openPendingQuery() {

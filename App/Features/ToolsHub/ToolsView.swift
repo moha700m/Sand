@@ -9,74 +9,72 @@ struct ToolsView: View {
     @State private var error: String?
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    Picker("", selection: $segment) {
-                        Text("أدواتي").tag(0)
-                        Text("المدمجة").tag(1)
-                    }
-                    .pickerStyle(.segmented)
-                    .listRowBackground(Color.clear)
+        List {
+            Section {
+                Picker("", selection: $segment) {
+                    Text("أدواتي").tag(0)
+                    Text("المدمجة").tag(1)
                 }
+                .pickerStyle(.segmented)
+                .listRowBackground(Color.clear)
+            }
 
-                if segment == 0 {
-                    if state.userTools.all.isEmpty {
-                        Section {
-                            Text("لم تصنع أدوات بعد. الأداة = اسم + وصف + كود JavaScript أو طلب HTTP، وتصبح متاحة للوكلاء.")
-                                .font(.footnote).foregroundStyle(.secondary)
-                        }
+            if segment == 0 {
+                if state.userTools.all.isEmpty {
+                    Section {
+                        Text("لم تصنع أدوات بعد. الأداة = اسم + وصف + كود JavaScript أو طلب HTTP، وتصبح متاحة للوكلاء.")
+                            .font(.footnote).foregroundStyle(.secondary)
                     }
-                    Section("منشأة") {
-                        ForEach(state.userTools.all) { tool in
-                            row(tool)
-                        }
+                }
+                Section("منشأة") {
+                    ForEach(state.userTools.all) { tool in
+                        row(tool)
                     }
-                } else {
-                    Section("أدوات مدمجة (\(state.registry.specs.count))") {
-                        ForEach(state.registry.specs) { spec in
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Label(spec.title, systemImage: spec.icon)
-                                    Spacer()
-                                    Text(spec.name).font(.caption2.monospaced()).foregroundStyle(.secondary)
-                                }
-                                Text(spec.description).font(.caption).foregroundStyle(.secondary)
-                                HStack(spacing: 6) {
-                                    tag(PermissionManager.permission(for: spec).title)
-                                    if spec.usesNetwork { tag("شبكة") }
-                                    if spec.requiresConfirmation { tag("يتطلب موافقة") }
-                                }
+                }
+            } else {
+                Section("أدوات مدمجة (\(state.registry.specs.count))") {
+                    ForEach(state.registry.specs) { spec in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Label(spec.title, systemImage: spec.icon)
+                                Spacer()
+                                Text(spec.name).font(.caption2.monospaced()).foregroundStyle(.secondary)
                             }
-                            .padding(.vertical, 2)
+                            Text(spec.description).font(.caption).foregroundStyle(.secondary)
+                            HStack(spacing: 6) {
+                                tag(PermissionManager.permission(for: spec).title)
+                                if spec.usesNetwork { tag("شبكة") }
+                                if spec.requiresConfirmation { tag("يتطلب موافقة") }
+                            }
                         }
+                        .padding(.vertical, 2)
                     }
                 }
+            }
 
-                if let error {
-                    Section { Text(error).font(.footnote).foregroundStyle(.red) }
+            if let error {
+                Section { Text(error).font(.footnote).foregroundStyle(.red) }
+            }
+        }
+        .navigationTitle("الأدوات")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { newTool() } label: { Image(systemName: "plus") }
+            }
+        }
+        .sheet(item: $editing) { tool in
+            ToolEditor(tool: tool) { saved in
+                do {
+                    try state.userTools.upsert(saved)
+                    state.registry.unregister(name: saved.name)
+                    UserToolRuntime.register(saved, into: state.registry)
+                } catch {
+                    self.error = error.localizedDescription
                 }
             }
-            .navigationTitle("الأدوات")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button { newTool() } label: { Image(systemName: "plus") }
-                }
-            }
-            .sheet(item: $editing) { tool in
-                ToolEditor(tool: tool) { saved in
-                    do {
-                        try state.userTools.upsert(saved)
-                        state.registry.unregister(name: saved.name)
-                        UserToolRuntime.register(saved, into: state.registry)
-                    } catch {
-                        self.error = error.localizedDescription
-                    }
-                }
-            }
-            .sheet(item: $testing) { tool in
-                ToolTestSheet(tool: tool)
-            }
+        }
+        .sheet(item: $testing) { tool in
+            ToolTestSheet(tool: tool)
         }
     }
 

@@ -9,37 +9,35 @@ struct SkillsView: View {
     @State private var error: String?
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    Text("المهارة ملف SKILL.md: تعليمات + أدوات مطلوبة + مدخلات. تُحمّل داخل الوكيل عند الحاجة، ولا تُنفّذ كوداً.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                }
-                ForEach(SkillCategory.allCases) { cat in
-                    let items = state.skills.all.filter { $0.category == cat }
-                    if !items.isEmpty {
-                        Section(cat.title) {
-                            ForEach(items) { skill in row(skill) }
-                        }
+        List {
+            Section {
+                Text("المهارة ملف SKILL.md: تعليمات + أدوات مطلوبة + مدخلات. تُحمّل داخل الوكيل عند الحاجة، ولا تُنفّذ كوداً.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            ForEach(SkillCategory.allCases) { cat in
+                let items = state.skills.all.filter { $0.category == cat }
+                if !items.isEmpty {
+                    Section(cat.title) {
+                        ForEach(items) { skill in row(skill) }
                     }
                 }
-                if let error {
-                    Section { Text(error).font(.footnote).foregroundStyle(.red) }
-                }
             }
-            .navigationTitle("المهارات")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button { importing = true } label: { Image(systemName: "square.and.arrow.down") }
-                }
+            if let error {
+                Section { Text(error).font(.footnote).foregroundStyle(.red) }
             }
-            .sheet(item: $editing) { s in SkillEditor(skill: s) }
-            .fileImporter(isPresented: $importing, allowedContentTypes: [.folder, .plainText, UTType(filenameExtension: "md") ?? .plainText]) { result in
-                if case .success(let url) = result { install(url) }
+        }
+        .navigationTitle("المهارات")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { importing = true } label: { Image(systemName: "square.and.arrow.down") }
             }
-            .sheet(item: Binding(get: { exportURL.map { Target(url: $0) } }, set: { if $0 == nil { exportURL = nil } })) { t in
-                ShareSheet(url: t.url).presentationDetents([.medium])
-            }
+        }
+        .sheet(item: $editing) { s in SkillEditor(skill: s) }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.folder, .plainText, UTType(filenameExtension: "md") ?? .plainText]) { result in
+            if case .success(let url) = result { install(url) }
+        }
+        .sheet(item: Binding(get: { exportURL.map { Target(url: $0) } }, set: { if $0 == nil { exportURL = nil } })) { t in
+            ShareSheet(url: t.url).presentationDetents([.medium])
         }
     }
 

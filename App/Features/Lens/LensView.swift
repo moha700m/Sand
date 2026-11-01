@@ -45,61 +45,59 @@ struct LensView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    imageArea
-                    HStack(spacing: 12) {
-                        Button { showCamera = true } label: { Label("الكاميرا", systemImage: "camera.fill").frame(maxWidth: .infinity) }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(!UIImagePickerController.isSourceTypeAvailable(.camera))
-                        PhotosPicker(selection: $photoItem, matching: .images) {
-                            Label("الصور", systemImage: "photo.on.rectangle").frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
+        ScrollView {
+            VStack(spacing: 16) {
+                imageArea
+                HStack(spacing: 12) {
+                    Button { showCamera = true } label: { Label("الكاميرا", systemImage: "camera.fill").frame(maxWidth: .infinity) }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(!UIImagePickerController.isSourceTypeAvailable(.camera))
+                    PhotosPicker(selection: $photoItem, matching: .images) {
+                        Label("الصور", systemImage: "photo.on.rectangle").frame(maxWidth: .infinity)
                     }
-                    .controlSize(.large)
+                    .buttonStyle(.bordered)
+                }
+                .controlSize(.large)
 
-                    if !text.isEmpty {
-                        Card {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Label("النص المستخرج (قابل للتعديل)", systemImage: "text.viewfinder").font(.headline)
-                                TextEditor(text: $text).frame(minHeight: 120).scrollContentBackground(.hidden)
-                            }
-                        }
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack {
-                                ForEach(Mode.allCases) { m in
-                                    Button { mode = m; ask() } label: { Label(m.title, systemImage: m.icon) }
-                                        .buttonStyle(.bordered)
-                                        .tint(mode == m ? Color.accentColor : .gray)
-                                }
-                                Button { SpeechService.shared.speak(text) } label: { Label("اقرأ بصوت", systemImage: "speaker.wave.2") }
-                                    .buttonStyle(.bordered)
-                                Button {
-                                    state.knowledge.add(title: "صورة \(Date().formatted(date: .abbreviated, time: .shortened))", text: text)
-                                    result = "تم حفظ النص في قاعدة المعرفة."
-                                } label: { Label("احفظ للمعرفة", systemImage: "books.vertical") }
-                                    .buttonStyle(.bordered)
-                            }
+                if !text.isEmpty {
+                    Card {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("النص المستخرج (قابل للتعديل)", systemImage: "text.viewfinder").font(.headline)
+                            TextEditor(text: $text).frame(minHeight: 120).scrollContentBackground(.hidden)
                         }
                     }
-                    if busy { ProgressView("يفكر…") }
-                    if let error { Text(error).font(.footnote).foregroundStyle(.red) }
-                    if !result.isEmpty { Card { MarkdownText(text: result) } }
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack {
+                            ForEach(Mode.allCases) { m in
+                                Button { mode = m; ask() } label: { Label(m.title, systemImage: m.icon) }
+                                    .buttonStyle(.bordered)
+                                    .tint(mode == m ? Color.accentColor : .gray)
+                            }
+                            Button { SpeechService.shared.speak(text) } label: { Label("اقرأ بصوت", systemImage: "speaker.wave.2") }
+                                .buttonStyle(.bordered)
+                            Button {
+                                state.knowledge.add(title: "صورة \(Date().formatted(date: .abbreviated, time: .shortened))", text: text)
+                                result = "تم حفظ النص في قاعدة المعرفة."
+                            } label: { Label("احفظ للمعرفة", systemImage: "books.vertical") }
+                                .buttonStyle(.bordered)
+                        }
+                    }
                 }
-                .padding()
+                if busy { ProgressView("يفكر…") }
+                if let error { Text(error).font(.footnote).foregroundStyle(.red) }
+                if !result.isEmpty { Card { MarkdownText(text: result) } }
             }
-            .navigationTitle("العدسة")
-            .safeAreaInset(edge: .top) { if !text.isEmpty { ModelStatusBanner() } }
-            .onChange(of: photoItem) { _, item in
-                Task {
-                    if let d = try? await item?.loadTransferable(type: Data.self), let img = UIImage(data: d) { await process(img) }
-                }
+            .padding()
+        }
+        .navigationTitle("العدسة")
+        .safeAreaInset(edge: .top) { if !text.isEmpty { ModelStatusBanner() } }
+        .onChange(of: photoItem) { _, item in
+            Task {
+                if let d = try? await item?.loadTransferable(type: Data.self), let img = UIImage(data: d) { await process(img) }
             }
-            .fullScreenCover(isPresented: $showCamera) {
-                CameraPicker { img in Task { await process(img) } }.ignoresSafeArea()
-            }
+        }
+        .fullScreenCover(isPresented: $showCamera) {
+            CameraPicker { img in Task { await process(img) } }.ignoresSafeArea()
         }
     }
 

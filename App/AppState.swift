@@ -49,11 +49,15 @@ final class AppState: ObservableObject {
     @Published var packages: [AgentPackage] = []
     @Published var pendingConfirmation: PendingConfirmation?
     @Published var lensHandoff: String?
+    /// Deep link requested from Home or another screen.
+    @Published var pendingAgentID: String?
+    @Published var pendingConversationID: UUID?
     /// Query handed in from Siri/Shortcuts; opened as a new chat.
     @Published var pendingQuery: String?
     var pendingAutoSend: String?
 
     let settings = AppSettings()
+    let runner = AgentRunner()
     let engine: LlamaEngine
     let models: ModelManager
     let registry = ToolRegistry()
@@ -96,6 +100,7 @@ final class AppState: ObservableObject {
         WorkspaceTools.register(into: registry, store: workspace, context: workspaceContext)
         userTools.registerAll(into: registry)
         AppStateHolder.shared = self
+        runner.attach(self)
         applyLaunchArguments()
         migrateLegacyAgentsIfNeeded()
     }
@@ -252,6 +257,18 @@ final class AppState: ObservableObject {
     func resolveConfirmation(_ allowed: Bool) {
         pendingConfirmation?.continuation.resume(returning: allowed)
         pendingConfirmation = nil
+    }
+
+    // MARK: Cross-tab navigation
+
+    func openAgent(_ id: String) {
+        pendingAgentID = id
+        tab = .agents
+    }
+
+    func openConversation(_ id: UUID) {
+        pendingConversationID = id
+        tab = .chat
     }
 
     // MARK: Privacy

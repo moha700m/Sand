@@ -1,84 +1,195 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// Everything that does not need its own tab, in one short list.
+/// Each entry is a real destination; nothing here is decorative.
+enum MoreRoute: String, Hashable, CaseIterable {
+    case tools, skills, workspace, arena, lens
+    case knowledge, notes, memory
+    case providers, mcp, server
+    case saudi, settings
+}
+
 struct MoreView: View {
     @EnvironmentObject var state: AppState
+    @EnvironmentObject var models: ModelManager
+    @EnvironmentObject var runner: AgentRunner
     @State private var path = NavigationPath()
 
     var body: some View {
         NavigationStack(path: $path) {
-            List {
-                Section("البناء") {
-                    NavigationLink(value: "tools") { row("الأدوات", "hammer.fill", .pink, "\(state.userTools.all.count) أداة منشأة") }
-                    NavigationLink(value: "workspace") { row("مساحة العمل", "folder.fill", .orange, "\(state.packages.count) مساحة · \(state.workspace.totalBytes(state.workspaceContext.agentID).fileSize)") }
-                    NavigationLink(value: "skills") { row("المهارات", "books.vertical.fill", .teal, "\(state.skills.all.count) مهارة · SKILL.md") }
-                    NavigationLink(value: "importModel") { row("إضافة نموذج بالرابط", "arrow.down.circle", .indigo, "Hugging Face · GGUF") }
-                    NavigationLink(value: "arena") { row("الساحة", "trophy", .yellow, "مقارنة أ/ب · وضع أعمى · تصنيف Elo") }
-                    NavigationLink(value: "modelDetail") { row("قياس النموذج", "speedometer", .mint, "سرعة · تقييم جودة · إعدادات") }
-                }
-                Section {
-                    NavigationLink(value: "lens") { row("العدسة", "camera.viewfinder", .cyan, "قراءة نص من صورة ثم شرح أو ترجمة") }
-                    NavigationLink(value: "saudi") { row("أدوات سعودية", "star.circle.fill", .green, "هجري، صلاة، قبلة، زكاة، ضريبة، نهاية خدمة") }
-                    NavigationLink(value: "knowledge") { row("قاعدة المعرفة", "books.vertical.fill", .orange, "\(state.knowledge.documents.count) مستند") }
-                    NavigationLink(value: "notes") { row("الملاحظات", "note.text", .yellow, "\(state.notes.notes.count) ملاحظة") }
-                }
-                Section("القوة") {
-                    NavigationLink(value: "providers") { row("مزودو السحابة", "cloud.bolt.fill", .indigo, "\(state.providers.count) مزود · GPT · Claude · Gemini") }
-                    NavigationLink(value: "mcp") { row("خوادم MCP", "puzzlepiece.extension.fill", .purple, "\(state.mcp.servers.filter(\.enabled).count) مفعّل · \(state.mcp.totalTools) أداة") }
-                    NavigationLink(value: "memory") { row("الذاكرة والتخصيص", "brain.head.profile", .pink, "\(state.memory.all.count) ذكرى") }
-                }
-                Section {
-                    NavigationLink(value: "server") { row("خادم API المحلي", "server.rack", .blue, state.server.isRunning ? "يعمل" : "متوقف") }
-                    NavigationLink(value: "settings") { row("الإعدادات", "gearshape.fill", .gray, "النموذج، المظهر، الخصوصية") }
-                }
-                Section {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("سَنَد AI").font(.headline)
-                        Text("ذكاء اصطناعي محلي وسحابي بهوية سعودية. النماذج المحلية تعمل بدون إنترنت، والسحابية والويب وMCP تستخدم الإنترنت لقوة أكبر. لا حساب ولا تحليلات.")
-                            .font(.footnote).foregroundStyle(.secondary)
+            ScrollView {
+                VStack(spacing: 16) {
+                    statusCard
+
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                        NavigationLink(value: MoreRoute.tools) {
+                            MoreTile(icon: "hammer.fill", color: .pink, title: "الأدوات",
+                                     subtitle: "\(state.userTools.all.count) منشأة")
+                        }
+                        NavigationLink(value: MoreRoute.skills) {
+                            MoreTile(icon: "books.vertical.fill", color: .teal, title: "المهارات",
+                                     subtitle: "\(state.skills.all.count) مهارة")
+                        }
+                        NavigationLink(value: MoreRoute.workspace) {
+                            MoreTile(icon: "folder.fill", color: .orange, title: "مساحة العمل",
+                                     subtitle: state.workspace.totalBytes(state.workspaceContext.agentID).fileSize)
+                        }
+                        NavigationLink(value: MoreRoute.arena) {
+                            MoreTile(icon: "trophy.fill", color: .yellow, title: "الساحة",
+                                     subtitle: "مقارنة أ/ب")
+                        }
+                        NavigationLink(value: MoreRoute.lens) {
+                            MoreTile(icon: "camera.viewfinder", color: .cyan, title: "العدسة",
+                                     subtitle: "نص من صورة")
+                        }
+                        NavigationLink(value: MoreRoute.knowledge) {
+                            MoreTile(icon: "doc.text.magnifyingglass", color: .indigo, title: "المعرفة",
+                                     subtitle: "\(state.knowledge.documents.count) مستند")
+                        }
                     }
+                    .buttonStyle(.plain)
+
+                    group("بياناتك", [
+                        (.notes, "note.text", .yellow, "الملاحظات", "\(state.notes.notes.count) ملاحظة"),
+                        (.memory, "brain.head.profile", .pink, "الذاكرة والتخصيص", "\(state.memory.all.count) ذكرى"),
+                    ])
+
+                    group("التشغيل", [
+                        (.providers, "cloud.bolt.fill", .indigo, "مزودو السحابة", state.providers.isEmpty ? "لم يُضف مزود" : "\(state.providers.count) مزود"),
+                        (.mcp, "puzzlepiece.extension.fill", .purple, "خوادم MCP", "\(state.mcp.servers.filter(\.enabled).count) مفعّل"),
+                        (.server, "server.rack", .blue, "خادم API المحلي", state.server.isRunning ? "يعمل" : "متوقف"),
+                    ])
+
+                    group("عام", [
+                        (.saudi, "star.circle.fill", .green, "أدوات سعودية", "هجري · صلاة · زكاة · نهاية خدمة"),
+                        (.settings, "gearshape.fill", .gray, "الإعدادات", "النموذج، المظهر، الخصوصية"),
+                    ])
+
+                    VStack(spacing: 4) {
+                        Text("سَنَد AI").font(.footnote.weight(.semibold))
+                        Text("ذكاء اصطناعي محلي وسحابي بهوية سعودية. لا حساب ولا تحليلات.")
+                            .font(.caption2).foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 8)
                 }
+                .padding()
+                .padding(.bottom, 20)
             }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("المزيد")
-            .navigationDestination(for: String.self) { s in
-                switch s {
-                case "tools": ToolsView()
-                case "workspace": WorkspaceView()
-                case "skills": SkillsView()
-                case "importModel": ModelImportView()
-                case "arena": ArenaView()
-                case "modelDetail": ModelDetailView(ref: "local", displayName: state.models.activeModel?.name ?? "نموذج محلي")
-                case "lens": LensView()
-                case "saudi": SaudiToolsView()
-                case "knowledge": KnowledgeView()
-                case "notes": NotesView()
-                case "server": ServerView()
-                case "providers": ProvidersView()
-                case "mcp": MCPServersView(mcp: state.mcp)
-                case "memory": MemoryView()
-                default: SettingsView()
-                }
-            }
+            .navigationDestination(for: MoreRoute.self) { destination($0) }
             .onAppear(perform: openDeepLink)
             .onChange(of: state.deepLinkScreen) { _, _ in openDeepLink() }
         }
     }
 
-    func openDeepLink() {
-        if let s = state.deepLinkScreen, ["saudi", "server", "knowledge", "settings", "providers", "mcp", "memory", "tools", "workspace", "skills", "lens", "importModel", "arena", "modelDetail"].contains(s) {
-            state.deepLinkScreen = nil
-            path.append(s)
+    var statusCard: some View {
+        Button { state.tab = .models } label: {
+            HStack(spacing: 12) {
+                Image(systemName: state.engineReady ? "cpu.fill" : "cpu")
+                    .font(.title2)
+                    .foregroundStyle(state.engineReady ? Color.green : Color.secondary)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(state.engineReady ? (models.activeModel?.name ?? "نموذج محلي") : "لا يوجد نموذج محمّل")
+                        .font(.headline).foregroundStyle(.primary)
+                    Text(state.engineReady ? "يعمل على الجهاز" : "اختر نموذجاً للبدء")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("\(runner.activeJobs.count) مهمة جارية")
+                        .font(.caption2).foregroundStyle(runner.activeJobs.isEmpty ? Color.secondary : Color.accentColor)
+                    Text("\(models.installed.count) نموذج مثبّت")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+            }
+            .padding(14)
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    func group(_ title: String, _ rows: [(MoreRoute, String, Color, String, String)]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                .padding(.leading, 4)
+            VStack(spacing: 0) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
+                    NavigationLink(value: row.0) {
+                        HStack(spacing: 12) {
+                            Image(systemName: row.1)
+                                .foregroundStyle(.white)
+                                .frame(width: 30, height: 30)
+                                .background(row.2, in: RoundedRectangle(cornerRadius: 8))
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(row.3).foregroundStyle(.primary)
+                                Text(row.4).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.left")
+                                .font(.caption2).foregroundStyle(.tertiary)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                    }
+                    .buttonStyle(.plain)
+                    if index < rows.count - 1 {
+                        Divider().padding(.leading, 56)
+                    }
+                }
+            }
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
     }
 
-    func row(_ t: String, _ icon: String, _ c: Color, _ sub: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon).foregroundStyle(.white).frame(width: 32, height: 32).background(c, in: RoundedRectangle(cornerRadius: 8))
-            VStack(alignment: .leading) {
-                Text(t)
-                Text(sub).font(.caption).foregroundStyle(.secondary)
+    @ViewBuilder func destination(_ route: MoreRoute) -> some View {
+        switch route {
+        case .tools: ToolsView()
+        case .skills: SkillsView()
+        case .workspace: WorkspaceView()
+        case .arena: ArenaView()
+        case .lens: LensView()
+        case .knowledge: KnowledgeView()
+        case .notes: NotesView()
+        case .memory: MemoryView()
+        case .providers: ProvidersView()
+        case .mcp: MCPServersView(mcp: state.mcp)
+        case .server: ServerView()
+        case .saudi: SaudiToolsView()
+        case .settings: SettingsView()
+        }
+    }
+
+    func openDeepLink() {
+        guard let raw = state.deepLinkScreen, let route = MoreRoute(rawValue: raw) else { return }
+        state.deepLinkScreen = nil
+        path = NavigationPath()
+        path.append(route)
+    }
+}
+
+struct MoreTile: View {
+    let icon: String
+    let color: Color
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Image(systemName: icon)
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(color, in: RoundedRectangle(cornerRadius: 9))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.footnote.weight(.semibold)).foregroundStyle(.primary)
+                Text(subtitle).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
