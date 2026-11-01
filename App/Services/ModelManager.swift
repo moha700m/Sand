@@ -146,8 +146,9 @@ final class ModelManager: NSObject, ObservableObject {
         }
         let free = Self.freeSpace()
         if free > 0, info.fileSize + 200_000_000 > free {
-            let f = ByteCountFormatter()
-            throw ToolError("المساحة غير كافية: الحجم \(f.string(fromByteCount: info.fileSize, countStyle: .file)) والمتاح \(f.string(fromByteCount: free, countStyle: .file)).")
+            let need = ByteCountFormatter.string(fromByteCount: info.fileSize, countStyle: .file)
+            let have = ByteCountFormatter.string(fromByteCount: free, countStyle: .file)
+            throw ToolError("المساحة غير كافية: الحجم \(need) والمتاح \(have).")
         }
 
         let dest = Self.modelsDirectory.appendingPathComponent(url.lastPathComponent)
