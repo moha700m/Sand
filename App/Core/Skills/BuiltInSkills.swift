@@ -4,8 +4,8 @@ import Foundation
 public enum BuiltInSkills {
     public static let all: [SkillPackage] = [
         SkillPackage(
-            id: "ios-swiftui", name: "تطوير iOS بـ SwiftUI", version: "1.0.0",
-            summary: "بناء شاشات SwiftUI وتنظيم المشاريع ومراجعة الكود قبل التسليم.",
+            id: "ios-swiftui", name: "تطوير iOS بـ SwiftUI",
+            summary: "بناء شاشات SwiftUI وتنظيم المشاريع ومراجعة الكود قبل التسليم.", version: "1.0.0",
             category: .ios,
             tools: ["workspace_write", "workspace_read", "workspace_search", "run_javascript"],
             inputs: ["goal"],
@@ -20,8 +20,8 @@ public enum BuiltInSkills {
             """,
             builtIn: true),
         SkillPackage(
-            id: "code-review", name: "مراجعة كود صارمة", version: "1.0.0",
-            summary: "مراجعة منهجية تبحث عن الأخطاء الحقيقية أولاً ثم التحسينات.",
+            id: "code-review", name: "مراجعة كود صارمة",
+            summary: "مراجعة منهجية تبحث عن الأخطاء الحقيقية أولاً ثم التحسينات.", version: "1.0.0",
             category: .programming,
             tools: ["workspace_read", "workspace_search", "workspace_write"],
             inputs: ["path"],
@@ -37,8 +37,8 @@ public enum BuiltInSkills {
             """,
             builtIn: true),
         SkillPackage(
-            id: "deep-research", name: "بحث موثّق", version: "1.0.0",
-            summary: "بحث متعدد المصادر مع تحقق وتوثيق المراجع.",
+            id: "deep-research", name: "بحث موثّق",
+            summary: "بحث متعدد المصادر مع تحقق وتوثيق المراجع.", version: "1.0.0",
             category: .research,
             tools: ["web_search", "fetch_url", "notes_add"],
             inputs: ["question"],
@@ -52,8 +52,8 @@ public enum BuiltInSkills {
             """,
             builtIn: true),
         SkillPackage(
-            id: "arabic-writing", name: "كتابة عربية احترافية", version: "1.0.0",
-            summary: "تحرير النصوص العربية: وضوح، إيجاز، اتساق المصطلح.",
+            id: "arabic-writing", name: "كتابة عربية احترافية",
+            summary: "تحرير النصوص العربية: وضوح، إيجاز، اتساق المصطلح.", version: "1.0.0",
             category: .writing,
             tools: ["workspace_read", "workspace_write"],
             inputs: ["text"],
@@ -67,8 +67,8 @@ public enum BuiltInSkills {
             """,
             builtIn: true),
         SkillPackage(
-            id: "document-analysis", name: "تحليل مستندات", version: "1.0.0",
-            summary: "استخراج وتلخيص ومقارنة مستندات المستخدم مع الاستشهاد بالمصدر.",
+            id: "document-analysis", name: "تحليل مستندات",
+            summary: "استخراج وتلخيص ومقارنة مستندات المستخدم مع الاستشهاد بالمصدر.", version: "1.0.0",
             category: .documents,
             tools: ["knowledge_search", "read_document", "workspace_write"],
             inputs: ["document", "question"],
@@ -82,8 +82,8 @@ public enum BuiltInSkills {
             """,
             builtIn: true),
         SkillPackage(
-            id: "data-analysis", name: "تحليل بيانات", version: "1.0.0",
-            summary: "حساب وتحليل دقيق عبر JavaScript مع جدول نتائج.",
+            id: "data-analysis", name: "تحليل بيانات",
+            summary: "حساب وتحليل دقيق عبر JavaScript مع جدول نتائج.", version: "1.0.0",
             category: .data,
             tools: ["run_javascript", "calculator", "workspace_read", "workspace_write"],
             inputs: ["csv", "question"],
@@ -97,8 +97,8 @@ public enum BuiltInSkills {
             """,
             builtIn: true),
         SkillPackage(
-            id: "saudi-business", name: "أعمال سعودية", version: "1.0.0",
-            summary: "زكاة، ضريبة 15%، نهاية خدمة، تقويم هجري ومواقيت الصلاة.",
+            id: "saudi-business", name: "أعمال سعودية",
+            summary: "زكاة، ضريبة 15%، نهاية خدمة، تقويم هجري ومواقيت الصلاة.", version: "1.0.0",
             category: .business,
             tools: ["zakat", "vat", "end_of_service", "hijri_date", "prayer_times", "calculator"],
             inputs: ["amount"],
@@ -112,8 +112,8 @@ public enum BuiltInSkills {
             """,
             builtIn: true),
         SkillPackage(
-            id: "prompt-engineering", name: "هندسة أوامر", version: "1.0.0",
-            summary: "كتابة أوامر نظام واضحة وقابلة للاختبار للنماذج المحلية.",
+            id: "prompt-engineering", name: "هندسة أوامر",
+            summary: "كتابة أوامر نظام واضحة وقابلة للاختبار للنماذج المحلية.", version: "1.0.0",
             category: .aiDev,
             tools: ["workspace_write", "notes_add"],
             inputs: ["task"],
@@ -127,8 +127,8 @@ public enum BuiltInSkills {
             """,
             builtIn: true),
         SkillPackage(
-            id: "automation", name: "أتمتة مهام", version: "1.0.0",
-            summary: "تحويل الطلب المتكرر إلى أداة قابلة للاستدعاء.",
+            id: "automation", name: "أتمتة مهام",
+            summary: "تحويل الطلب المتكرر إلى أداة قابلة للاستدعاء.", version: "1.0.0",
             category: .automation,
             tools: ["workspace_write", "run_javascript", "http_request"],
             inputs: ["task"],
