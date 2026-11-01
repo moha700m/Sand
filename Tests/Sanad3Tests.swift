@@ -301,3 +301,44 @@ final class GGUFInspectorTests: XCTestCase {
         XCTAssertTrue(GGUFInspector.inspect(url).isProjector)
     }
 }
+
+// MARK: - Lenient GGUF + device capacity
+
+final class DeviceCapacityTests: XCTestCase {
+    func testTinyModelFits() {
+        XCTAssertEqual(DeviceCapacity.verdict(forWeights: 400_000_000), .fits)
+    }
+
+    func testHugeModelDoesNotFit() {
+        XCTAssertEqual(DeviceCapacity.verdict(forWeights: 900_000_000_000), .tooBig)
+    }
+
+    func testUnknownSize() {
+        XCTAssertEqual(DeviceCapacity.verdict(forWeights: 0), .unknown)
+    }
+
+    func testPeakIncludesOverhead() {
+        let peak = DeviceCapacity.peakBytes(forWeights: 1_000_000_000)
+        XCTAssertGreaterThan(peak, 1_000_000_000)
+        XCTAssertLessThan(peak, 2_000_000_000)
+    }
+
+    func testGarbageMetadataDoesNotBlockLoading() {
+        // Valid header, one metadata entry whose type is unknown (13) — must warn, not reject.
+        var d = Data([0x47, 0x47, 0x55, 0x46])
+        withUnsafeBytes(of: UInt32(3).littleEndian) { d.append(contentsOf: $0) }
+        withUnsafeBytes(of: UInt64(1).littleEndian) { d.append(contentsOf: $0) }
+        withUnsafeBytes(of: UInt64(1).littleEndian) { d.append(contentsOf: $0) }
+        let key = Array("general.weird".utf8)
+        withUnsafeBytes(of: UInt64(key.count).littleEndian) { d.append(contentsOf: $0) }
+        d.append(contentsOf: key)
+        withUnsafeBytes(of: UInt32(13).littleEndian) { d.append(contentsOf: $0) }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("weird-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("weird.gguf")
+        try? d.write(to: url)
+        let info = GGUFInspector.inspect(url)
+        XCTAssertTrue(info.isUsable, info.problems.joined())
+        XCTAssertFalse(info.warnings.isEmpty)
+    }
+}

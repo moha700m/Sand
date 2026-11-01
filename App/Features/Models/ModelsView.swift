@@ -55,7 +55,12 @@ struct ModelsView: View {
             HStack {
                 Label("ذاكرة الجهاز", systemImage: "memorychip")
                 Spacer()
-                Text(ram).foregroundStyle(.secondary)
+                Text(DeviceCapacity.summary).foregroundStyle(.secondary)
+            }
+            HStack {
+                Label("سقف النموذج الآمن", systemImage: "gauge.with.dots.needle.33percent")
+                Spacer()
+                Text(DeviceCapacity.budgetDescription).foregroundStyle(.secondary)
             }
             if let m = models.activeModel, state.engineReady {
                 HStack {

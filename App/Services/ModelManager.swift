@@ -133,8 +133,9 @@ final class ModelManager: NSObject, ObservableObject {
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         guard url.pathExtension.lowercased() == "gguf" else { throw ToolError("الملف يجب أن يكون بصيغة GGUF") }
         let info = GGUFInspector.inspect(url)
-        guard info.isUsable else {
-            throw ToolError("ملف GGUF غير صالح: " + (info.problems.first ?? "بنية غير مكتملة"))
+        guard GGUFInspector.looksLikeGGUF(url), info.fileSize > 1_000_000 else {
+            let reason = info.problems.first ?? "الملف لا يبدأ بترويسة GGUF"
+            throw ToolError("تعذّر استيراد \(url.lastPathComponent) (\(ByteCountFormatter.string(fromByteCount: info.fileSize, countStyle: .file))): \(reason)")
         }
         let dest = Self.modelsDirectory.appendingPathComponent(url.lastPathComponent)
         if FileManager.default.fileExists(atPath: dest.path) { try FileManager.default.removeItem(at: dest) }
@@ -151,10 +152,12 @@ final class ModelManager: NSObject, ObservableObject {
 
     func load(_ m: ModelInfo, contextLength: Int) async {
         guard !isLoading else { return }
-        if !ModelCatalog.fits(m, memory: Self.physicalMemory) && !UserDefaults.standard.bool(forKey: "ignoreMemoryCheck") {
-            lastError = LLMError.insufficientMemory(needed: UInt64(m.estimatedMemoryBytes),
-                                                    available: UInt64(Double(Self.physicalMemory) * 0.65)).localizedDescription
-                + "\nيمكنك تجاوز الفحص من الإعدادات على مسؤوليتك."
+        let verdict = DeviceCapacity.verdict(for: m)
+        if verdict == .tooBig && !UserDefaults.standard.bool(forKey: "ignoreMemoryCheck") {
+            lastError = "هذا النموذج لا يناسب جهازك: يحتاج تقريباً "
+                + ByteCountFormatter.string(fromByteCount: DeviceCapacity.peakBytes(forWeights: m.sizeBytes), countStyle: .memory)
+                + " والمتاح " + DeviceCapacity.budgetDescription
+                + ". جرّب قياساً أصغر (Q4 بدل Q8).\nيمكنك تجاوز الفحص من الإعدادات على مسؤوليتك."
             return
         }
         isLoading = true
@@ -225,9 +228,10 @@ extension ModelManager: URLSessionDownloadDelegate {
                 return
             }
             let info = GGUFInspector.inspect(staged)
-            guard info.isUsable else {
+            guard GGUFInspector.looksLikeGGUF(staged), info.fileSize > 1_000_000 else {
                 try? FileManager.default.removeItem(at: staged)
-                downloads[id]?.failed = "الملف الذي نزل ليس GGUF صالحاً: " + (info.problems.first ?? "")
+                let size = ByteCountFormatter.string(fromByteCount: info.fileSize, countStyle: .file)
+                downloads[id]?.failed = "التنزيل غير مكتمل أو ليس GGUF (\(size)). أعد المحاولة."
                 return
             }
             let dest = fileURL(for: m)

@@ -145,10 +145,9 @@ struct HFRepoView: View {
                     .padding(.horizontal, 5).padding(.vertical, 1)
                     .background(Color.primary.opacity(0.06), in: Capsule())
                 if file.size > 0 {
-                    let need = Int64(Double(file.size) * 1.2) + 350_000_000
-                    if Double(need) > Double(ModelManager.physicalMemory) * 0.65 {
-                        Text("أكبر من ذاكرة جهازك").foregroundStyle(.orange)
-                    }
+                    let verdict = DeviceCapacity.verdict(forWeights: file.size)
+                    Label(verdict.title, systemImage: verdict.icon)
+                        .foregroundStyle(color(for: verdict))
                 }
             }
             .font(.caption2).foregroundStyle(.secondary)
@@ -161,6 +160,15 @@ struct HFRepoView: View {
             .buttonStyle(.bordered).controlSize(.small)
         }
         .padding(.vertical, 2)
+    }
+
+    func color(for verdict: FitVerdict) -> Color {
+        switch verdict {
+        case .fits: return .green
+        case .tight: return .orange
+        case .tooBig: return .red
+        case .unknown: return .secondary
+        }
     }
 
     func load() async {

@@ -19,6 +19,8 @@ public struct GGUFInfo: Equatable, Sendable {
     public var isProjector: Bool = false
     public var isComplete: Bool = false
     public var problems: [String] = []
+    /// Non-fatal: the header is valid, but the metadata could not be fully read.
+    public var warnings: [String] = []
 
     public var isUsable: Bool { problems.isEmpty && isComplete }
 
@@ -117,7 +119,8 @@ public enum GGUFInspector {
         // Only treat a parse failure as damage when we actually read the whole file.
         info.isComplete = parsedAll || truncatedByWindow
         if !parsedAll && !truncatedByWindow {
-            info.problems = ["تعذّرت قراءة بيانات GGUF — الملف مقطوع أو تالف."]
+            // Never block loading on this: header is intact, metadata is optional for us.
+            info.warnings = ["لم أستطع قراءة كل البيانات الوصفية — الملف قد يكون غريب البنية."]
         }
         return info
     }
@@ -164,7 +167,11 @@ public enum GGUFInspector {
         }
         mutating func readIntegerValue(type: UInt32) -> UInt64? {
             switch type {
-            case 0, 1, 2, 3, 7: return readU8().map(UInt64.init)
+            case 0, 1, 7: return readU8().map(UInt64.init)
+            case 2, 3:
+                guard offset + 2 <= data.count else { return nil }
+                defer { offset += 2 }
+                return UInt64(UInt16(data[offset]) | UInt16(data[offset + 1]) << 8)
             case 4, 5: return readU32().map(UInt64.init)
             case 10, 11: return readU64()
             default:
