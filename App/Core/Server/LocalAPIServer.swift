@@ -104,6 +104,8 @@ public final class LocalAPIServer {
             send(c, HTTPResponse.make(status: 200, json: ["models": [["name": modelName(), "model": modelName()]]] as [String: Any]))
         case ("POST", "/v1/chat/completions"):
             await chat(r, c, ollama: false)
+        case ("POST", "/v1/messages"):
+            await anthropicMessages(r, c)
         case ("POST", "/api/chat"), ("POST", "/api/generate"):
             await chat(r, c, ollama: true, generate: r.path == "/api/generate")
         default:
@@ -166,6 +168,67 @@ public final class LocalAPIServer {
                 }
             }
         }
+    }
+
+    // MARK: - Anthropic Messages compatibility
+
+    private func anthropicMessages(_ r: HTTPRequest, _ c: NWConnection) async {
+        guard let p = ChatPayload.parseAnthropic(r.body) else {
+            send(c, HTTPResponse.error(400, "invalid Anthropic body")); return
+        }
+        guard let b = backend(), b.isReady else {
+            send(c, HTTPResponse.error(503, "no model loaded in Sanad AI")); return
+        }
+        let id = "msg_" + UUID().uuidString.prefix(12).lowercased()
+        let model = modelName()
+
+        await gate.run {
+            if p.stream {
+                self.send(c, HTTPResponse.streamHead(contentType: "text/event-stream"), close: false)
+                self.send(c, Self.anthropicFrame("message_start", ["type": "message_start",
+                    "message": ["id": id, "type": "message", "role": "assistant", "model": model,
+                                "content": [Any](), "stop_reason": NSNull(), "usage": ["input_tokens": 0, "output_tokens": 0]]]), close: false)
+                self.send(c, Self.anthropicFrame("content_block_start", ["type": "content_block_start",
+                    "index": 0, "content_block": ["type": "text", "text": ""]]), close: false)
+                do {
+                    _ = try await b.generate(messages: p.messages, settings: p.settings, stop: []) { piece in
+                        self.send(c, Self.anthropicFrame("content_block_delta", ["type": "content_block_delta",
+                            "index": 0, "delta": ["type": "text_delta", "text": piece]]), close: false)
+                        return true
+                    }
+                    self.send(c, Self.anthropicFrame("content_block_stop", ["type": "content_block_stop", "index": 0]), close: false)
+                    self.send(c, Self.anthropicFrame("message_delta", ["type": "message_delta",
+                        "delta": ["stop_reason": "end_turn", "stop_sequence": NSNull()],
+                        "usage": ["output_tokens": 0]]), close: false)
+                    self.send(c, Self.anthropicFrame("message_stop", ["type": "message_stop"]))
+                } catch {
+                    self.send(c, Self.anthropicFrame("error", ["type": "error",
+                        "error": ["type": "api_error", "message": error.localizedDescription]]))
+                }
+            } else {
+                do {
+                    let (text, stats) = try await b.generate(messages: p.messages, settings: p.settings, stop: []) { _ in true }
+                    let clean = p.settings.hideThinking ? ThinkingFilter.strip(text) : text
+                    let json: [String: Any] = [
+                        "id": id, "type": "message", "role": "assistant", "model": model,
+                        "content": [["type": "text", "text": clean]],
+                        "stop_reason": "end_turn", "stop_sequence": NSNull(),
+                        "usage": ["input_tokens": stats.promptTokens, "output_tokens": stats.generatedTokens],
+                    ]
+                    self.send(c, HTTPResponse.make(status: 200, json: json))
+                } catch {
+                    self.send(c, HTTPResponse.error(500, error.localizedDescription))
+                }
+            }
+        }
+    }
+
+    static func anthropicFrame(_ event: String, _ obj: [String: Any]) -> Data {
+        let data = (try? JSONSerialization.data(withJSONObject: obj)) ?? Data("{}".utf8)
+        var out = Data("event: \(event)\ndata: ".utf8)
+        out.append(data)
+        out.append(Data("\n\n".utf8))
+        return out
     }
 
     static func frame(_ obj: [String: Any], sse: Bool) -> Data {

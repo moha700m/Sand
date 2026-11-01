@@ -75,6 +75,37 @@ public enum ChatPayload {
         public var settings: GenerationSettings
     }
 
+
+    /// Anthropic Messages API request body: `system` plus `messages` with text blocks.
+    public static func parseAnthropic(_ body: Data) -> Parsed? {
+        guard let obj = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else { return nil }
+        var msgs: [ChatMessage] = []
+        if let system = obj["system"] as? String, !system.isEmpty {
+            msgs.append(ChatMessage(role: .system, content: system))
+        } else if let blocks = obj["system"] as? [[String: Any]] {
+            let text = blocks.compactMap { $0["text"] as? String }.joined(separator: "\n")
+            if !text.isEmpty { msgs.append(ChatMessage(role: .system, content: text)) }
+        }
+        for m in (obj["messages"] as? [[String: Any]]) ?? [] {
+            let role = ChatRole(rawValue: (m["role"] as? String) ?? "user") ?? .user
+            var text = ""
+            if let s = m["content"] as? String { text = s }
+            else if let parts = m["content"] as? [[String: Any]] {
+                text = parts.compactMap { $0["text"] as? String }.joined(separator: "\n")
+            }
+            guard !text.isEmpty else { continue }
+            msgs.append(ChatMessage(role: role, content: text))
+        }
+        guard !msgs.isEmpty else { return nil }
+        var s = GenerationSettings()
+        if let t = obj["temperature"] as? Double { s.temperature = min(1, max(0, t)) }
+        if let p = obj["top_p"] as? Double { s.topP = p }
+        if let k = obj["top_k"] as? Int { s.topK = k }
+        if let m = obj["max_tokens"] as? Int { s.maxTokens = max(1, min(m, 8192)) }
+        s.maxTokens = max(1, s.maxTokens)
+        return Parsed(messages: msgs, stream: (obj["stream"] as? Bool) ?? false, settings: s)
+    }
+
     public static func parse(_ body: Data, ollama: Bool = false) -> Parsed? {
         guard let obj = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else { return nil }
         var msgs: [ChatMessage] = []
