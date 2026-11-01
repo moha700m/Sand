@@ -187,3 +187,61 @@ final class Sanad3Tests: XCTestCase {
         XCTAssertFalse(policy.allows(tool: "web_search"))
     }
 }
+
+// MARK: - 3.1 Arena / Eval / Tuning
+
+final class ArenaTests: XCTestCase {
+    func testEloExpectedAtEqualRatings() {
+        XCTAssertEqual(Elo.expected(1200, 1200), 0.5, accuracy: 0.0001)
+        XCTAssertGreaterThan(Elo.expected(1400, 1200), 0.5)
+        XCTAssertLessThan(Elo.expected(1000, 1200), 0.5)
+    }
+
+    func testEloWinnerGainsPoints() {
+        let (a, b) = Elo.update(a: 1200, b: 1200, scoreA: 1)
+        XCTAssertGreaterThan(a, 1200)
+        XCTAssertLessThan(b, 1200)
+        XCTAssertEqual(a + b, 2400, accuracy: 0.0001)
+    }
+
+    func testEloTieKeepsEqualRatings() {
+        let (a, b) = Elo.update(a: 1200, b: 1200, scoreA: 0.5)
+        XCTAssertEqual(a, 1200, accuracy: 0.0001)
+        XCTAssertEqual(b, 1200, accuracy: 0.0001)
+    }
+
+    func testArenaRecordUpdatesLeaderboard() {
+        let store = ArenaStore(fileName: nil)
+        let match = ArenaMatch(prompt: "س", refA: "local", refB: "cloud",
+                               nameA: "محلي", nameB: "سحابي", answerA: "أ", answerB: "ب",
+                               secondsA: 1, secondsB: 2, blind: true)
+        store.record(match, winner: .a)
+        let board = store.leaderboard
+        XCTAssertEqual(board.count, 2)
+        XCTAssertEqual(board.first?.name, "محلي")
+        XCTAssertEqual(board.first?.rating.wins, 1)
+    }
+
+    func testTuningOverridesOnlySpecifiedFields() {
+        var base = GenerationSettings()
+        base.temperature = 0.7
+        base.maxTokens = 512
+        let tuned = ModelTuning(temperature: 0.1).applied(to: base)
+        XCTAssertEqual(tuned.temperature, 0.1)
+        XCTAssertEqual(tuned.maxTokens, 512)
+    }
+
+    func testEvalCaseChecksAreDeterministic() {
+        guard let json = QualityEval.cases.first(where: { $0.id == "json" }) else { return XCTFail("missing case") }
+        XCTAssertTrue(json.check("{\"name\": \"سَنَد\"}"))
+        XCTAssertFalse(json.check("لا يوجد JSON هنا"))
+
+        guard let math = QualityEval.cases.first(where: { $0.id == "math" }) else { return XCTFail("missing case") }
+        XCTAssertTrue(math.check("391"))
+        XCTAssertFalse(math.check("390"))
+
+        guard let arabic = QualityEval.cases.first(where: { $0.id == "arabic" }) else { return XCTFail("missing case") }
+        XCTAssertTrue(arabic.check("الرياض مدينة جميلة ومتنامية"))
+        XCTAssertFalse(arabic.check("Riyadh"))
+    }
+}
