@@ -186,7 +186,7 @@ struct SettingsView: View {
         if token.isEmpty {
             Keychain.delete("hfToken")
         } else {
-            Keychain.set(token, forKey: "hfToken")
+            Keychain.set(token, for: "hfToken")
         }
         hfToken = token
     }

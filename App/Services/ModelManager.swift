@@ -200,6 +200,7 @@ final class ModelManager: NSObject, ObservableObject {
         st.retrying = nil
         st.paused = false
         downloads[m.id] = st
+        syncIdleTimer()
         task.resume()
     }
 
@@ -216,6 +217,7 @@ final class ModelManager: NSObject, ObservableObject {
             Task { @MainActor in
                 guard let self else { return }
                 self.tasks[m.id] = nil
+                self.syncIdleTimer()
                 if let data { self.persistResumeData(data, for: m.id) }
                 var st = self.downloads[m.id] ?? DownloadState(total: m.sizeBytes)
                 st.paused = true
@@ -229,6 +231,7 @@ final class ModelManager: NSObject, ObservableObject {
     func cancel(_ m: ModelInfo) {
         tasks[m.id]?.cancel()
         tasks[m.id] = nil
+        syncIdleTimer()
         resumeData[m.id] = nil
         attempts[m.id] = nil
         autoPaused.remove(m.id)
@@ -248,6 +251,7 @@ final class ModelManager: NSObject, ObservableObject {
     func cleanPartialDownloads() {
         tasks.values.forEach { $0.cancel() }
         tasks.removeAll(); resumeData.removeAll(); downloads.removeAll(); attempts.removeAll()
+        syncIdleTimer()
         let tmp = FileManager.default.temporaryDirectory
         for f in (try? FileManager.default.contentsOfDirectory(at: tmp, includingPropertiesForKeys: nil)) ?? [] {
             try? FileManager.default.removeItem(at: f)
@@ -504,6 +508,12 @@ final class ModelManager: NSObject, ObservableObject {
         })
     }
 
+    /// A foreground URLSession dies when iOS auto-locks the device, so keep the
+    /// screen awake while a transfer is actually running.
+    private func syncIdleTimer() {
+        UIApplication.shared.isIdleTimerDisabled = !tasks.isEmpty
+    }
+
     private func pauseForBackground() {
         for id in Array(tasks.keys) {
             guard let m = knownModel(id) else { continue }
@@ -554,6 +564,7 @@ extension ModelManager: URLSessionDownloadDelegate {
         let moved = (try? FileManager.default.moveItem(at: location, to: staged)) != nil
         MainActor.assumeIsolated {
             tasks[id] = nil
+            syncIdleTimer()
             guard let m = registered[id] ?? ModelCatalog.model(id: id) else {
                 try? FileManager.default.removeItem(at: staged)
                 return
@@ -621,6 +632,7 @@ extension ModelManager: URLSessionDownloadDelegate {
         let cancelled = ns.domain == NSURLErrorDomain && ns.code == NSURLErrorCancelled
         MainActor.assumeIsolated {
             tasks[id] = nil
+            syncIdleTimer()
             // Pause/cancel already set the state; don't turn it into a failure.
             guard !cancelled else { return }
             if let data { persistResumeData(data, for: id) }
