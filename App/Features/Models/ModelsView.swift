@@ -134,14 +134,29 @@ struct ModelsView: View {
                         HStack {
                             Text(item.model.name).font(.subheadline.weight(.semibold)).lineLimit(1)
                             Spacer()
-                            if let failed = item.state.failed {
+                            if item.state.failed != nil {
                                 Text("فشل").font(.caption2).foregroundStyle(.red)
+                            } else if item.state.paused {
+                                Text("متوقف").font(.caption2).foregroundStyle(.orange)
+                            } else if item.state.retrying != nil {
+                                Text("إعادة محاولة").font(.caption2).foregroundStyle(.orange)
                             } else {
                                 Text("\(Int(item.state.fraction * 100))%").font(.caption.monospacedDigit())
                             }
                         }
                         if let failed = item.state.failed {
                             Text(failed).font(.caption2).foregroundStyle(.red)
+                            Text("المحاولات: \(item.state.attempt)/\(max(1, item.state.maxAttempts))")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        } else if let retrying = item.state.retrying {
+                            HStack(spacing: 6) {
+                                ProgressView().controlSize(.mini)
+                                Text(retrying)
+                            }
+                            .font(.caption2).foregroundStyle(.orange)
+                        } else if item.state.paused {
+                            Text("محفوظ مؤقتاً — اضغط استئناف للمتابعة من حيث توقف.")
+                                .font(.caption2).foregroundStyle(.secondary)
                         } else {
                             ProgressView(value: item.state.fraction)
                             HStack(spacing: 8) {
@@ -154,10 +169,10 @@ struct ModelsView: View {
                             .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
                         }
                         HStack(spacing: 8) {
-                            if item.state.failed != nil || models.isPaused(item.model) {
+                            if item.state.failed != nil || item.state.paused {
                                 Button("استئناف") { models.download(item.model) }
                                     .buttonStyle(.bordered).controlSize(.small)
-                            } else {
+                            } else if item.state.retrying == nil {
                                 Button("إيقاف") { models.pause(item.model) }
                                     .buttonStyle(.bordered).controlSize(.small)
                             }

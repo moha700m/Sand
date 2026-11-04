@@ -61,11 +61,26 @@ public enum HuggingFaceHub {
         return repos
     }
 
+    /// Injected by the app layer (Keychain lives outside `App/Core`, which the
+    /// test target also compiles). Nil means "no token".
+    public static var tokenProvider: (() -> String?)?
+
+    /// Adds a bearer token when the user saved one in Settings.
+    /// Anonymous Hub calls are rate-limited hard (HTTP 429) and gated
+    /// repositories answer 401/403 without it.
+    public static func authorize(_ request: inout URLRequest) {
+        guard let raw = tokenProvider?() else { return }
+        let token = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !token.isEmpty else { return }
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    }
+
     static func request(_ url: URL) async throws -> [HFRepo] {
         var req = URLRequest(url: url)
         req.timeoutInterval = 25
         req.setValue("application/json", forHTTPHeaderField: "Accept")
-        req.setValue("SanadAI/3.0 (iOS; local model browser)", forHTTPHeaderField: "User-Agent")
+        req.setValue("SanadAI/3.3 (iOS; local model browser)", forHTTPHeaderField: "User-Agent")
+        authorize(&req)
         let (data, response) = try await URLSession.shared.data(for: req)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else { throw HFError.http(status) }
@@ -87,6 +102,8 @@ public enum HuggingFaceHub {
         var req = URLRequest(url: url)
         req.timeoutInterval = 25
         req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("SanadAI/3.3 (iOS; local model browser)", forHTTPHeaderField: "User-Agent")
+        authorize(&req)
         let (data, response) = try await URLSession.shared.data(for: req)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else { throw HFError.http(status) }

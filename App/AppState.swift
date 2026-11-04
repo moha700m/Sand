@@ -100,6 +100,7 @@ final class AppState: ObservableObject {
         WorkspaceTools.register(into: registry, store: workspace, context: workspaceContext)
         userTools.registerAll(into: registry)
         AppStateHolder.shared = self
+        HuggingFaceHub.tokenProvider = { Keychain.get("hfToken") }
         applyLaunchArguments()
         migrateLegacyAgentsIfNeeded()
     }

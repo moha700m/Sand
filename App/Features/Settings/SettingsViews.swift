@@ -95,6 +95,7 @@ struct SettingsView: View {
     @EnvironmentObject var settings: AppSettings
     @State private var gen = GenerationSettings()
     @State private var confirmWipe = false
+    @State private var hfToken = ""
 
     var body: some View {
         Form {
@@ -143,6 +144,23 @@ struct SettingsView: View {
                 LabeledContent("ذاكرة الجهاز", value: Int64(ModelManager.physicalMemory).fileSize)
             }
             Section {
+                SecureField("hf_...", text: $hfToken)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .environment(\.layoutDirection, .leftToRight)
+                Button("حفظ التوكن") { saveHFToken() }
+                if !hfToken.isEmpty {
+                    Button("حذف التوكن", role: .destructive) {
+                        hfToken = ""
+                        Keychain.delete("hfToken")
+                    }
+                }
+            } header: {
+                Text("Hugging Face (اختياري)")
+            } footer: {
+                Text("توكن قراءة يرفع حدّ الطلبات ويسمح بتحميل المستودعات المحمية. يُخزَّن في Keychain على جهازك فقط ولا يُرسل لأي طرف آخر.")
+            }
+            Section {
                 Button("مسح كل البيانات", role: .destructive) { confirmWipe = true }
             } header: { Text("الخصوصية") } footer: {
                 Text("يحذف المحادثات والمستندات والملاحظات والمهارات والأدوات والمفاتيح. النماذج المحمّلة تبقى ويمكن حذفها من تبويب النماذج.")
@@ -153,11 +171,24 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("الإعدادات")
-        .onAppear { gen = settings.generation }
+        .onAppear {
+            gen = settings.generation
+            hfToken = Keychain.get("hfToken") ?? ""
+        }
         .onChange(of: gen) { _, v in settings.generation = v }
         .confirmationDialog("سيتم حذف كل بياناتك نهائياً.", isPresented: $confirmWipe, titleVisibility: .visible) {
             Button("مسح الكل", role: .destructive) { state.wipeAllData() }
         }
+    }
+
+    private func saveHFToken() {
+        let token = hfToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        if token.isEmpty {
+            Keychain.delete("hfToken")
+        } else {
+            Keychain.set(token, forKey: "hfToken")
+        }
+        hfToken = token
     }
 }
 
